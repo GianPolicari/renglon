@@ -12,7 +12,7 @@
     "not_found_handling": "404-page",
     "html_handling": "auto-trailing-slash",
     // the worker also sees the home page, /admin and robots.txt to tell prod, admin and test apart
-    "run_worker_first": ["/api/*", "/", "/admin", "/admin/*", "/robots.txt"]
+    "run_worker_first": ["/api/*", "/", "/admin", "/admin/*", "/robots.txt", "/bancos", "/bancos/*", "/preguntas", "/preguntas/*", "/privacidad", "/privacidad/*", "/terminos", "/terminos/*"]
   },
   // Same D1 database as Cleanbasis (same Cloudflare account); this app uses its own tables (rs_*).
   "d1_databases": [

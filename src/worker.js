@@ -15,7 +15,7 @@ const OUTCOMES = new Set(['ok', 'mismatch', 'no_total', 'no_rows', 'no_text', 'e
 // kind of statement: bank account or credit card
 const SOFTWARE = new Set(['cuenta', 'tarjeta', 'other']);
 // issuer detected in the PDF (column name kept as 'broker' to share the admin panel code)
-const BROKERS = new Set(['galicia', 'santander', 'nacion', 'provincia', 'bbva', 'macro', 'ciudad', 'icbc', 'supervielle', 'patagonia', 'credicoop', 'hipotecario', 'comafi', 'columbia', 'brubank', 'arq', 'uala', 'mercadopago', 'naranjax', 'amex', 'visa', 'mastercard', 'cabal', 'sample', 'unknown']);
+const BROKERS = new Set(['galicia', 'santander', 'nacion', 'provincia', 'bbva', 'macro', 'ciudad', 'icbc', 'supervielle', 'patagonia', 'credicoop', 'hsbc', 'bancor', 'santafe', 'hipotecario', 'comafi', 'columbia', 'brubank', 'arq', 'uala', 'mercadopago', 'naranjax', 'amex', 'visa', 'mastercard', 'cabal', 'sample', 'unknown']);
 const FORMATS = new Set(['xlsx', 'csv']);
 const PAGES = new Set(['/', '/admin', '/preguntas', '/privacidad', '/terminos', '/404']);
 const REF_SOURCES = new Set(['direct', 'google', 'bing', 'duckduckgo', 'reddit', 'facebook', 'instagram', 'linkedin', 'x', 'youtube', 'whatsapp', 'chatgpt', 'perplexity', 'email', 'other']);
@@ -349,7 +349,7 @@ async function handlePage(request, env, url) {
   }
   // test copy: same files, a visible notice on the converter and kept out of search engines
   const res = withHeaders(await env.ASSETS.fetch(request), { 'X-Robots-Tag': 'noindex, nofollow', 'Cache-Control': 'no-store' });
-  if (url.pathname !== '/' || !(res.headers.get('Content-Type') || '').includes('text/html')) return res;
+  if (!(res.headers.get('Content-Type') || '').includes('text/html')) return res;
   res.headers.delete('ETag');
   return new HTMLRewriter()
     .on('head', { element: e => e.append('<meta name="robots" content="noindex,nofollow">', { html: true }) })

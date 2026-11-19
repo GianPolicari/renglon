@@ -201,7 +201,7 @@
   const BANKS = { galicia: 'Banco Galicia', santander: 'Santander', nacion: 'Banco Nación', provincia: 'Banco Provincia', bbva: 'BBVA', macro: 'Banco Macro',
     ciudad: 'Banco Ciudad', icbc: 'ICBC', supervielle: 'Supervielle', patagonia: 'Banco Patagonia', credicoop: 'Credicoop', hipotecario: 'Banco Hipotecario',
     comafi: 'Banco Comafi', columbia: 'Banco Columbia', brubank: 'Brubank', uala: 'Ualá', mercadopago: 'Mercado Pago', naranjax: 'Naranja X', arq: 'ARQ',
-    amex: 'American Express', cabal: 'Cabal', mastercard: 'Mastercard', visa: 'Visa', sample: 'ejemplo inventado' };
+    hsbc: 'HSBC', bancor: 'Bancor', santafe: 'Banco Santa Fe', amex: 'American Express', cabal: 'Cabal', mastercard: 'Mastercard', visa: 'Visa', sample: 'ejemplo inventado' };
   // Excel: a "Resumen" sheet with the balance check, then the movements with totals, filters and the rows to review highlighted
   function workbook() {
     const s = sheet(), n = s.rows.length, c = result.check, card = result.kind === 'tarjeta';
@@ -227,8 +227,8 @@
       parts.forEach(([name, a, rows], i) => {
         if (name) R.push(...(i ? [[]] : []), [{ v: name, s: 'label' }]);
         R.push([{ v: 'Saldo anterior', s: 'label' }, { v: M(a.opening), s: 'moneyBold' }],
-          [{ v: 'Créditos', s: 'label' }, { v: M(rows.reduce((x, r) => x + (r.credit || 0), 0)), s: 'moneyBold' }],
-          [{ v: 'Débitos', s: 'label' }, { v: M(-rows.reduce((x, r) => x + Math.abs(r.debit || 0), 0)), s: 'moneyBold' }],
+          [{ v: 'Créditos', s: 'label' }, { v: M(r2(rows.reduce((x, r) => x + (r.credit || 0), 0))), s: 'moneyBold' }],
+          [{ v: 'Débitos', s: 'label' }, { v: M(-r2(rows.reduce((x, r) => x + Math.abs(r.debit || 0), 0))), s: 'moneyBold' }],
           [{ v: '= Saldo calculado', s: 'totalLabel' }, { v: M(a.expected), s: 'totalMoney' }],
           [{ v: 'Saldo según el resumen', s: 'label' }, { v: M(a.closing), s: 'moneyBold' }], [verdict(a.state)]);
       });

@@ -269,7 +269,7 @@
     ['galicia', /banco galicia|galicia/i], ['santander', /santander/i], ['nacion', /banco de la naci[oó]n|banco naci[oó]n|\bbna\b/i],
     ['provincia', /banco provincia|bancoprovincia|provincia de buenos aires/i], ['bbva', /bbva|franc[eé]s/i], ['macro', /banco macro|\bmacro\b/i],
     ['ciudad', /banco ciudad|ciudad de buenos aires/i], ['icbc', /icbc/i], ['supervielle', /supervielle/i], ['patagonia', /patagonia/i],
-    ['credicoop', /credicoop/i], ['hipotecario', /hipotecario/i], ['comafi', /comafi/i], ['columbia', /banco columbia/i],
+    ['credicoop', /credicoop/i], ['hsbc', /hsbc/i], ['bancor', /\bbancor\b|banco de c[oó]rdoba/i], ['santafe', /banco (de )?santa fe/i], ['hipotecario', /hipotecario/i], ['comafi', /comafi/i], ['columbia', /banco columbia/i],
     ['brubank', /brubank/i], ['arq', /arqfinance|d[oó]larapp|\barq\b/i], ['uala', /ual[aá]/i], ['mercadopago', /mercado ?pago/i], ['naranjax', /naranja/i],
     ['amex', /american express|\bamex\b/i], ['cabal', /cabal/i], ['mastercard', /mastercard/i], ['visa', /\bvisa\b/i],
     ['sample', /banco ejemplo|ejemplo s\.a\.|resumen sint[eé]tico/i],

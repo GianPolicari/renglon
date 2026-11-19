@@ -2,7 +2,7 @@
 Run: python3 tools/build_pages.py"""
 import html, pathlib
 ROOT = pathlib.Path(__file__).resolve().parent.parent / 'public'
-UPDATED = '17 de noviembre de 2026'
+UPDATED = '19 de noviembre de 2026'
 CONTACT = 'gianfrancopolicari@gmail.com'
 SITE = 'https://renglon.com.ar'
 NAME = 'Renglón'
@@ -308,6 +308,7 @@ def privacy():
     <li>Si bajaste el resultado, en qué formato, y tu respuesta a "¿Los saldos coinciden con tu resumen?".</li>
     <li>Un identificador al azar para cada archivo que convertís, para unir los pasos de una misma conversión. No sale del archivo.</li>
     <li>Un identificador al azar de la pestaña del navegador, que se borra al cerrarla, y una marca de "ya visitó" sin identificador.</li>
+    <li>Si la visita parece hecha por un programa automático (un robot) y por qué: el navegador avisa que lo controla un programa, se presenta como robot o se conecta desde una red de servidores. El nombre de esa red se mira en el momento y no se guarda.</li>
     <li>Si la página tiene un error: solo el tipo de error, nunca su mensaje ni tus datos.</li>
     <li>Si elegís mandar el diseño de un resumen que no se pudo leer: las palabras de los títulos de las columnas, todas las demás palabras cambiadas por T y todos los números por 9, y la posición de cada valor en la página. Nunca nombres, descripciones ni importes. Antes de mandarlo ves exactamente qué se manda.</li>
   </ul>
@@ -318,7 +319,7 @@ def privacy():
   <h2>Contacto</h2>
   <p>Escribinos a <a href="mailto:{CONTACT}">{CONTACT}</a>. También podés pedir que borremos cualquier dato que creas vinculado a vos.</p>
   </section>'''
-    page('privacidad', f'Privacidad | {NAME}', 'Cómo trata el conversor tus archivos y los datos anónimos de uso.', body, '/privacidad')
+    page('privacidad', f'Privacidad | {NAME}', 'Cómo trata Renglón tus resúmenes (no se suben: se leen en tu navegador) y qué datos anónimos de uso guarda, dónde y por cuánto tiempo.', body, '/privacidad')
 
 def terms():
     body = f'''  <h1>Términos de uso</h1>
@@ -339,7 +340,7 @@ def terms():
   <h2>7. Contacto</h2>
   <p>Escribinos a <a href="mailto:{CONTACT}">{CONTACT}</a>.</p>
   </section>'''
-    page('terminos', f'Términos de uso | {NAME}', 'Términos de uso del conversor de resúmenes bancarios y de tarjeta.', body, '/terminos')
+    page('terminos', f'Términos de uso | {NAME}', 'Términos de uso de Renglón, el conversor gratuito de resúmenes bancarios y de tarjeta de crédito en PDF a Excel.', body, '/terminos')
 
 def not_found():
     page('404', f'Página no encontrada | {NAME}', 'Esta página no existe.', '''  <h1>Página no encontrada</h1>
