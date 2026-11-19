@@ -179,9 +179,13 @@
     const M = v => v == null ? '' : { money: v }, D = iso => iso ? { date: iso } : '';
     if (result.kind === 'cuenta') {
       const local = result.rows.some(r => r.local != null);
-      return { head: ['Fecha', 'Descripción', 'Referencia', 'Débito', 'Crédito', 'Importe', 'Saldo', ...(local ? ['Moneda local', 'Monto local'] : []), 'Página', 'Revisar'],
+      // no running balance on the statement (wallets): compute it from the opening balance, and say so in the heading
+      const calc = !result.rows.some(r => r.balance != null) && result.check && result.check.opening != null;
+      let run = calc ? result.check.opening : 0;
+      const bal = r => calc ? (run = Math.round((run + (r.amount || 0)) * 100) / 100) : r.balance;
+      return { head: ['Fecha', 'Descripción', 'Referencia', 'Débito', 'Crédito', 'Importe', calc ? 'Saldo (calculado)' : 'Saldo', ...(local ? ['Moneda local', 'Monto local'] : []), 'Página', 'Revisar'],
         widths: [12, 46, 14, 15, 15, 15, 16, ...(local ? [9, 15] : []), 8, 34], money: [3, 4, 5], right: [3, 4, 5, 6, ...(local ? [8] : [])],
-        rows: result.rows.map(r => [D(r.date), r.desc, r.ref, M(r.debit), M(r.credit), M(r.amount), M(r.balance), ...(local ? [r.localCur || '', M(r.local)] : []), r.page, r.flags.join('; ')]) };
+        rows: result.rows.map(r => [D(r.date), r.desc, r.ref, M(r.debit), M(r.credit), M(r.amount), M(bal(r)), ...(local ? [r.localCur || '', M(r.local)] : []), r.page, r.flags.join('; ')]) };
     }
     return { head: ['Fecha', 'Descripción', 'Tipo', 'Comprobante', 'Cuota', 'Pesos', 'Dólares', 'Página', 'Revisar'], widths: [12, 44, 18, 13, 8, 16, 14, 8, 34], money: [5, 6], right: [5, 6],
       rows: result.rows.map(r => [D(r.date), r.desc, TYPE[r.type] || '', r.ref, r.cuota, M(r.ars), M(r.usd), r.page, r.flags.join('; ')]) };
