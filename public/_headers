@@ -17,3 +17,7 @@
 
 /assets/fonts/*
   Cache-Control: public, max-age=31536000, immutable
+
+# the test copy (same files, nothing stored) stays out of search engines; the worker does the same for the pages it serves
+https://test.renglon.com.ar/*
+  X-Robots-Tag: noindex, nofollow

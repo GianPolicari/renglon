@@ -46,7 +46,7 @@ p,li{max-width:68ch}
 .nav{display:flex;gap:22px}
 .nav a{color:var(--navy-ink);opacity:.78;text-decoration:none;font-weight:500;font-size:15px;padding:4px 0;border-bottom:2px solid transparent}
 .nav a:hover{opacity:1}
-.nav a[aria-current="page"]{opacity:1;border-bottom-color:var(--brass)}
+.nav a[aria-current]{opacity:1;border-bottom-color:var(--brass)}
 
 .wrap{max-width:1120px;margin:0 auto;padding:44px 24px 56px}
 main{display:block}
