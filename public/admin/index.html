@@ -1,0 +1,75 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="robots" content="noindex,nofollow">
+<title>Renglón: admin</title>
+<link rel="stylesheet" href="/assets/site.css">
+<link rel="stylesheet" href="/admin/admin.css">
+</head>
+<body data-page="/admin">
+<div class="wrap">
+  <header>
+    <a class="logo" href="/">Renglón</a>
+    <div class="tag">Usage monitor · <span id="live" class="live">offline</span></div>
+  </header>
+
+  <section class="card" id="login">
+    <h2>Admin key</h2>
+    <form id="keyForm" class="row">
+      <label for="key" class="sr">Admin key</label>
+      <input id="key" type="password" autocomplete="current-password" placeholder="Paste the ADMIN_TOKEN value" required minlength="24">
+      <label class="tag"><input type="checkbox" id="remember"> Remember on this device</label>
+      <button class="primary" type="submit">Open</button>
+    </form>
+    <p class="notice" id="loginMsg"></p>
+  </section>
+
+  <div id="dash" hidden>
+    <p class="artnote" id="dashMsg" role="alert" hidden></p>
+    <section class="kpis" id="kpis"></section>
+    <p class="notice">Statistics leave out your own visits (marked <span class="badge warn">you</span> in the tables). Any browser where you open this panel is recognized as yours.</p>
+
+    <section class="card">
+      <div class="row rowshead"><h2>Funnel (7 days, unique visits)</h2><span class="tag">Sample files excluded from "Converted"</span></div>
+      <div class="funnel" id="funnel"></div>
+    </section>
+
+    <section class="card">
+      <div class="row rowshead"><h2>Processed files (7 days)</h2><span class="tag">No file names or amounts are ever collected</span></div>
+      <div class="tablewrap"><table>
+        <thead><tr><th>Time</th><th>Country</th><th>Banco</th><th>Result</th><th>Error</th><th class="n">Size KB</th><th class="n">Pages</th><th class="n">Rows</th><th class="n">To review</th><th class="n">Sections OK</th><th class="n">ms</th><th>Downloaded</th><th>Totals match?</th></tr></thead>
+        <tbody id="files"></tbody>
+      </table></div>
+    </section>
+
+    <section class="card">
+      <div class="row rowshead"><h2>Layouts sent for unrecognized statements</h2><span class="tag">Headings with digits masked · R lines show value kinds and positions</span></div>
+      <div id="layouts"></div>
+    </section>
+
+    <section class="card">
+      <div class="row rowshead"><h2>Live activity</h2><span class="tag">Updates every 5 seconds · times in your time zone</span></div>
+      <div class="tablewrap"><table>
+        <thead><tr><th>Time</th><th>Country</th><th>Event</th><th>Result</th><th>Error</th><th>Banco</th><th class="n">Pages</th><th class="n">Rows</th><th class="n">Sections OK</th><th class="n">ms</th><th>Browser</th></tr></thead>
+        <tbody id="feed"></tbody>
+      </table></div>
+    </section>
+
+    <div class="cols">
+      <section class="card"><h2>Last 24 hours, by hour</h2><div id="hourly" class="bars"></div></section>
+      <section class="card"><h2>Countries (7 days)</h2><ul class="list" id="countries"></ul></section>
+      <section class="card"><h2>Errors (7 days)</h2><ul class="list" id="errors"></ul></section>
+      <section class="card"><h2>Banks and cards (7 days)</h2><ul class="list" id="brokers"></ul></section>
+      <section class="card"><h2>Traffic sources (7 days)</h2><ul class="list" id="refs"></ul></section>
+      <section class="card"><h2>Devices (7 days)</h2><ul class="list" id="devices"></ul></section>
+      <section class="card"><h2>Software requests (90 days)</h2><ul class="list" id="wants"></ul></section>
+      <section class="card"><h2>Script errors (7 days)</h2><ul class="list" id="jserrors"></ul></section>
+    </div>
+    <p class="notice"><button class="linkbtn" id="logout">Forget key on this device</button></p>
+  </div>
+</div>
+<script src="/admin/admin.js"></script>
+</body>
+</html>

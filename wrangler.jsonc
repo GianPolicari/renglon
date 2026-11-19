@@ -1,0 +1,37 @@
+{
+  // Bank and credit card statement converter on Cloudflare Workers (free plan).
+  // Static site from public/; src/worker.js only runs for /api/* (anonymous usage counts + admin data).
+  "name": "renglon",
+  "main": "src/worker.js",
+  "compatibility_date": "2026-10-01",
+  "workers_dev": false,
+  "preview_urls": true,
+  "assets": {
+    "directory": "./public",
+    "binding": "ASSETS",
+    "not_found_handling": "404-page",
+    "html_handling": "auto-trailing-slash",
+    // the worker also sees the home page, /admin and robots.txt to tell prod, admin and test apart
+    "run_worker_first": ["/api/*", "/", "/admin", "/admin/*", "/robots.txt"]
+  },
+  // Same D1 database as Cleanbasis (same Cloudflare account); this app uses its own tables (rs_*).
+  "d1_databases": [
+    { "binding": "DB", "database_name": "taxdrop-telemetry", "database_id": "1b18aef6-060e-43e8-bd79-c0512b6b31f7" }
+  ],
+  // Per-IP limits, counted at the edge; IPs are never stored.
+  "ratelimits": [
+    { "name": "EVENT_LIMIT", "namespace_id": "2001", "simple": { "limit": 30, "period": 60 } },
+    { "name": "ADMIN_LIMIT", "namespace_id": "2002", "simple": { "limit": 60, "period": 60 } }
+  ],
+  // Zone renglon.com.ar in this account. www is redirected to the root by a zone Redirect Rule.
+  // admin. serves the usage monitor; test. is the same site storing nothing (see src/worker.js).
+  "routes": [
+    { "pattern": "renglon.com.ar", "custom_domain": true },
+    { "pattern": "www.renglon.com.ar", "custom_domain": true },
+    { "pattern": "admin.renglon.com.ar", "custom_domain": true },
+    { "pattern": "test.renglon.com.ar", "custom_domain": true }
+  ],
+  // Only PROD_HOSTS store usage counts; test. and preview URLs store nothing.
+  "vars": { "PROD_HOSTS": "renglon.com.ar", "ADMIN_HOST": "admin.renglon.com.ar" },
+  "observability": { "enabled": true }
+}

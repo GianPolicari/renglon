@@ -1,0 +1,340 @@
+// Reads an Argentine bank account or credit card statement (text extracted from the PDF by pdf.js)
+// and returns its movements, the statement's own totals and a check of one against the other.
+// Works in the browser (window.ResumenParser) and in Node (tests). No network, no eval.
+(function (root) {
+  'use strict';
+
+  // ---- amounts -------------------------------------------------------------------------------
+  // Argentine format 1.234.567,89; also 1234,56, -1.234,56, 1.234,56-, (1.234,56) and $ prefixes.
+  // A US-format amount (1,234.56) is accepted only when it cannot be Argentine.
+  const AMOUNT_RE = /^\(?[-−]?(?:\$|U\$S|US\$|USD)?\s?[-−]?(?:\d{1,3}(?:\.\d{3})+|\d+),\d{2}[-−]?\)?$|^\(?[-−]?\$?\d{1,3}(?:,\d{3})+\.\d{2}[-−]?\)?$/;
+  function parseAmount(s) {
+    if (s == null) return null;
+    let t = String(s).trim().replace(/−/g, '-').replace(/^(?:U\$S|US\$|USD|\$)\s?/, '');
+    if (!t) return null;
+    let neg = false;
+    if (/^\(.*\)$/.test(t)) { neg = true; t = t.slice(1, -1); }
+    t = t.replace(/^(?:U\$S|US\$|USD|\$)\s?/, '');
+    if (t.endsWith('-')) { neg = !neg; t = t.slice(0, -1); }
+    if (t.startsWith('-')) { neg = !neg; t = t.slice(1); }
+    t = t.replace(/^(?:U\$S|US\$|USD|\$)\s?/, '');
+    let v;
+    if (/^(?:\d{1,3}(?:\.\d{3})+|\d+),\d{2}$/.test(t)) v = Number(t.replace(/\./g, '').replace(',', '.'));
+    else if (/^\d{1,3}(?:,\d{3})+\.\d{2}$/.test(t)) v = Number(t.replace(/,/g, ''));
+    else return null;
+    if (!isFinite(v)) return null;
+    return Math.round((neg ? -v : v) * 100) / 100;
+  }
+  const isAmount = s => AMOUNT_RE.test(String(s).trim().replace(/−/g, '-'));
+  const r2 = v => Math.round(v * 100) / 100;
+
+  // ---- dates ---------------------------------------------------------------------------------
+  const MONTHS = { ene: 1, jan: 1, feb: 2, mar: 3, abr: 4, apr: 4, may: 5, jun: 6, jul: 7, ago: 8, aug: 8, sep: 9, set: 9, oct: 10, nov: 11, dic: 12, dec: 12 };
+  const DATE_FULL = /^(\d{1,2})[\/\-.](\d{1,2})[\/\-.](\d{2}|\d{4})$/;           // 05/10/2026, 5-10-26
+  const DATE_MON = /^(\d{1,2})[\-\s.\/]?([A-Za-zÁÉÍÓÚáéíóú]{3})[a-z.]*[\-\s.\/]?(\d{2}|\d{4})?$/; // 05-Oct-26, 05Oct, 05-oct
+  const DATE_SHORT = /^(\d{1,2})[\/\-](\d{1,2})$/;                                   // 05/10 (year from the statement)
+  const fullYear = y => (y < 100 ? 2000 + y : y);
+  function validDate(d, m, y) {
+    if (m < 1 || m > 12 || d < 1 || d > 31) return null;
+    const dt = new Date(Date.UTC(y, m - 1, d));
+    return dt.getUTCMonth() === m - 1 ? `${y}-${String(m).padStart(2, '0')}-${String(d).padStart(2, '0')}` : null;
+  }
+  // Date at the start of a line: returns { iso | partial: {d, m}, used } where used = tokens consumed.
+  function readDate(tokens) {
+    if (!tokens.length) return null;
+    const a = tokens[0].s, b = tokens[1] && tokens[1].s, c = tokens[2] && tokens[2].s;
+    let m;
+    if ((m = DATE_FULL.exec(a))) { const iso = validDate(+m[1], +m[2], fullYear(+m[3])); return iso ? { iso, used: 1 } : null; }
+    if ((m = DATE_MON.exec(a)) && MONTHS[m[2].toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '').slice(0, 3)]) {
+      const mo = MONTHS[m[2].toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '').slice(0, 3)];
+      if (m[3]) { const iso = validDate(+m[1], mo, fullYear(+m[3])); return iso ? { iso, used: 1 } : null; }
+      return { partial: { d: +m[1], m: mo }, used: 1 };
+    }
+    // "05 Oct 26" or "05 Oct" written as separate words
+    if (/^\d{1,2}$/.test(a) && b && MONTHS[b.toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/\.$/, '').slice(0, 3)] && /^[A-Za-zÁÉÍÓÚáéíóú.]{3,5}$/.test(b)) {
+      const mo = MONTHS[b.toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '').slice(0, 3)];
+      if (c && /^(\d{2}|\d{4})$/.test(c)) { const iso = validDate(+a, mo, fullYear(+c)); return iso ? { iso, used: 3 } : null; }
+      return { partial: { d: +a, m: mo }, used: 2 };
+    }
+    if ((m = DATE_SHORT.exec(a))) { const d = +m[1], mo = +m[2]; if (d >= 1 && d <= 31 && mo >= 1 && mo <= 12) return { partial: { d, m: mo }, used: 1 }; }
+    return null;
+  }
+
+  // ---- lines and words ------------------------------------------------------------------------
+  // items: [{str, x, y, w}] for one page (pdf.js text items). Words keep their left and right edge.
+  function toLines(items) {
+    const sorted = items.filter(i => i.str && i.str.trim()).slice().sort((p, q) => q.y - p.y || p.x - q.x);
+    const lines = [];
+    for (const it of sorted) {
+      const ln = lines.length ? lines[lines.length - 1] : null;
+      if (ln && Math.abs(ln.y - it.y) <= 2.5) ln.items.push(it); else lines.push({ y: it.y, items: [it] });
+    }
+    for (const ln of lines) {
+      ln.items.sort((p, q) => p.x - q.x);
+      ln.tokens = words(ln.items);
+      ln.text = ln.tokens.map(t => t.s).join(' ');
+    }
+    return lines;
+  }
+  function words(items) {
+    const out = [];
+    for (const it of items) {
+      const str = it.str, cw = str.length ? (it.w || str.length * 4.5) / str.length : 4.5;
+      const re = /\S+/g; let m;
+      while ((m = re.exec(str))) out.push({ s: m[0], x: it.x + m.index * cw, r: it.x + (m.index + m[0].length) * cw });
+    }
+    // "$" or "U$S" drawn apart from its amount, and "1.234,56" "-" drawn apart from its trailing sign
+    const merged = [];
+    for (let i = 0; i < out.length; i++) {
+      const t = out[i], n = out[i + 1];
+      if (n && /^(?:\$|U\$S|US\$|USD)$/.test(t.s) && isAmount(n.s) && n.x - t.r < 14) { merged.push({ s: t.s + ' ' + n.s, x: t.x, r: n.r, cur: t.s === '$' ? 'ARS' : 'USD' }); i++; continue; }
+      if (n && isAmount(t.s) && /^[-−]$/.test(n.s) && n.x - t.r < 6) { merged.push({ s: t.s + '-', x: t.x, r: n.r }); i++; continue; }
+      merged.push(t);
+    }
+    return merged;
+  }
+
+  // ---- column headings ------------------------------------------------------------------------
+  const norm = s => s.toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/[^a-z0-9$]/g, '');
+  // one heading word (or two joined) -> column role
+  function roleOf(w) {
+    const n = norm(w);
+    if (/^fecha|^fec$|^dia$/.test(n)) return 'date';
+    if (/^(concepto|descripcion|detalle|movimiento|movimientos|leyenda|operacion|transaccion|establecimiento)$/.test(n)) return 'desc';
+    if (/^(referencia|ref|comprobante|comprob|nrocomprobante|cupon|numero|nro|origen|codigo|cod)$/.test(n)) return 'ref';
+    if (/^cuotas?$|^plan$/.test(n)) return 'cuota';
+    if (/^(debitos?|debe|egresos?|retiros?|cargos?)$/.test(n)) return 'debit';
+    if (/^(creditos?|haber|ingresos?|depositos?|abonos?)$/.test(n)) return 'credit';
+    if (/^saldos?$/.test(n)) return 'balance';
+    if (/^(importe|importes|monto|montos)$/.test(n)) return 'amount';
+    if (/^(pesos|ars|\$)$/.test(n)) return 'ars';
+    if (/^(dolares|usd|us\$|u\$s|dolar)$/.test(n) || /^u\$s$|^us\$$/i.test(w)) return 'usd';
+    return null;
+  }
+  const MONEY = new Set(['debit', 'credit', 'balance', 'amount', 'ars', 'usd']);
+  // A heading line names a date column and at least one money column.
+  function readHeader(line) {
+    if (line.tokens.some(t => isAmount(t.s))) return null;   // a heading has words, not amounts
+    const cols = [];
+    for (const t of line.tokens) {
+      const role = roleOf(t.s);
+      if (!role) continue;
+      const prev = cols.length ? cols[cols.length - 1] : null;
+      if (prev && prev.role === role) { prev.r = t.r; continue; }         // "Saldo" "Saldos" side by side
+      cols.push({ role, x: t.x, r: t.r, c: (t.x + t.r) / 2 });
+    }
+    const roles = new Set(cols.map(c => c.role));
+    const money = cols.filter(c => MONEY.has(c.role)).length;
+    if (!money || cols.length < 2) return null;
+    if (!roles.has('date') && money < 2) return null;      // "PESOS DÓLARES" alone is a heading too
+    // "Importe" next to "Pesos"/"Dólares" headings is a group title, not a column of its own
+    if (roles.has('ars') || roles.has('usd')) return cols.filter(c => c.role !== 'amount');
+    return cols;
+  }
+  // Which money column an amount belongs to: amounts are right-aligned under their heading.
+  function moneyColumn(cols, tok) {
+    let best = null, bd = Infinity;
+    for (const c of cols) {
+      if (!MONEY.has(c.role)) continue;
+      if (tok.r < c.x - 25 || tok.r > c.r + 70) continue;   // not under this heading
+      const d = Math.min(Math.abs(tok.r - c.r), Math.abs((tok.x + tok.r) / 2 - c.c));
+      if (d < bd) { bd = d; best = c; }
+    }
+    return best;
+  }
+
+  // ---- summary lines -------------------------------------------------------------------------
+  const SUMMARY = [
+    ['opening', /saldo (anterior|inicial|al inicio)|saldo del (resumen|periodo) anterior|saldo ultimo resumen/],
+    ['closing', /saldo (final|actual|al cierre|a la fecha)|nuevo saldo|saldo del periodo|total a pagar|saldo de cierre/],
+    ['total_debits', /total (de )?(debitos|debe|egresos)/],
+    ['total_credits', /total (de )?(creditos|haber|ingresos)/],
+    ['minimum', /pago minimo/],
+    ['subtotal', /total (de )?consumos|subtotal/],
+  ];
+  function summaryKind(text) {
+    const t = text.toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '');
+    for (const [k, re] of SUMMARY) if (re.test(t)) return k;
+    return null;
+  }
+
+  const CUOTA_RE = /^(?:c\.?|cuota)?\s?(\d{1,2})\/(\d{1,2})$/i;
+
+  // ---- issuer --------------------------------------------------------------------------------
+  const ISSUERS = [
+    ['galicia', /banco galicia|galicia/i], ['santander', /santander/i], ['nacion', /banco de la naci[oó]n|banco naci[oó]n|\bbna\b/i],
+    ['provincia', /banco provincia|bancoprovincia|provincia de buenos aires/i], ['bbva', /bbva|franc[eé]s/i], ['macro', /banco macro|\bmacro\b/i],
+    ['ciudad', /banco ciudad|ciudad de buenos aires/i], ['icbc', /icbc/i], ['supervielle', /supervielle/i], ['patagonia', /patagonia/i],
+    ['credicoop', /credicoop/i], ['hipotecario', /hipotecario/i], ['comafi', /comafi/i], ['columbia', /banco columbia/i],
+    ['brubank', /brubank/i], ['uala', /ual[aá]/i], ['mercadopago', /mercado ?pago/i], ['naranjax', /naranja/i],
+    ['amex', /american express|\bamex\b/i], ['cabal', /cabal/i], ['mastercard', /mastercard/i], ['visa', /\bvisa\b/i],
+    ['sample', /banco ejemplo|ejemplo s\.a\.|resumen sint[eé]tico/i],
+  ];
+  function detectIssuer(pagesText) {
+    const t = pagesText.slice(0, 6000);
+    for (const [k, re] of ISSUERS) if (k === 'sample' && re.test(t)) return k;
+    for (const [k, re] of ISSUERS) if (re.test(t)) return k;
+    return 'unknown';
+  }
+
+  // ---- main ----------------------------------------------------------------------------------
+  // pages: array of pdf.js text item arrays. Returns { kind, rows, summary, check, warnings, issuer }.
+  function parse(pages) {
+    const rows = [], warnings = [], summary = { ars: {}, usd: {} };
+    let cols = null, last = null, latestIso = null;
+    const allText = [];
+
+    pages.forEach((items, pi) => {
+      const lines = toLines(items);
+      allText.push(lines.map(l => l.text).join('\n'));
+      let descLeft = null, descRight = null;
+      for (const ln of lines) {
+        const h = readHeader(ln);
+        if (h) { cols = h; last = null; setDescBounds(); continue; }
+        if (!cols) continue;
+        const toks = ln.tokens;
+        const amounts = toks.filter(t => isAmount(t.s));
+        const kind = summaryKind(ln.text);
+        if (kind && !readDate(toks)) {                          // "Saldo anterior ... 12.345,67"
+          for (const t of amounts) {
+            const c = moneyColumn(cols, t);
+            if (!c && !t.cur) continue;
+            const cur = t.cur === 'USD' || (c && c.role === 'usd') ? 'usd' : 'ars';
+            if (summary[cur][kind] == null) summary[cur][kind] = parseAmount(t.s);
+          }
+          last = null;
+          continue;
+        }
+        const d = readDate(toks);
+        if (d) {
+          const row = { date: d.iso || null, partial: d.partial || null, desc: '', ref: '', cuota: '', debit: null, credit: null, amount: null, balance: null, ars: null, usd: null, page: pi + 1, flags: [] };
+          if (d.iso && (!latestIso || d.iso > latestIso)) latestIso = d.iso;
+          const text = [];
+          for (const t of toks.slice(d.used)) {
+            if (isAmount(t.s) && moneyColumn(cols, t)) {
+              const c = moneyColumn(cols, t);
+              const v = parseAmount(t.s);
+              const role = t.cur === 'USD' && cols.some(k => k.role === 'usd') ? 'usd' : c.role;
+              if (row[role] == null) row[role] = v; else row.flags.push('dos importes en la misma columna');
+              continue;
+            }
+            const cm = CUOTA_RE.exec(t.s);
+            if (cm && +cm[1] <= +cm[2] && +cm[2] <= 99) { row.cuota = `${cm[1].padStart(2, '0')}/${cm[2].padStart(2, '0')}`; continue; }
+            // a voucher or reference number: digits, under a "Comprobante"/"Referencia" heading (some banks title the description "Referencia")
+            const mid = (t.x + t.r) / 2;
+            const refCol = cols.filter(c => c.role === 'ref').sort((p, q) => Math.abs(p.c - mid) - Math.abs(q.c - mid))[0];
+            if (refCol && /^[\dA-Z\-]{3,}$/.test(t.s) && /\d{5,}/.test(t.s) && Math.abs(mid - refCol.c) < 40 && !row.ref) { row.ref = t.s; continue; }
+            text.push(t.s);
+          }
+          row.desc = text.join(' ');
+          const hasMoney = ['debit', 'credit', 'amount', 'ars', 'usd'].some(k => row[k] != null);
+          if (!hasMoney && row.balance == null) { last = null; continue; }   // a date line with no amount: not a movement
+          rows.push(row); last = row;
+          continue;
+        }
+        // a line without a date: description continued on the next line, or a movement with no date of its own
+        if (!amounts.some(t => moneyColumn(cols, t)) && last && ln.text.length < 120 && descLeft != null && toks[0].x >= descLeft - 30 && toks[0].x <= descRight + 30) {
+          last.desc = (last.desc + ' ' + ln.text).trim();
+          continue;
+        }
+        if (amounts.some(t => moneyColumn(cols, t)) && last && toks.some(t => !isAmount(t.s)) && !kind) {
+          // taxes and charges printed under the last movement without a date (common on card statements)
+          const row = { date: last.date, partial: last.partial, desc: '', ref: '', cuota: '', debit: null, credit: null, amount: null, balance: null, ars: null, usd: null, page: pi + 1, flags: ['sin fecha en el resumen: se usó la del movimiento anterior'] };
+          const text = [];
+          for (const t of toks) {
+            const c = isAmount(t.s) ? moneyColumn(cols, t) : null;
+            if (c) { if (row[c.role] == null) row[c.role] = parseAmount(t.s); continue; }
+            text.push(t.s);
+          }
+          row.desc = text.join(' ');
+          rows.push(row); last = row;
+        }
+      }
+      function setDescBounds() {
+        const dc = cols.find(c => c.role === 'desc');
+        const dateC = cols.find(c => c.role === 'date');
+        const firstMoney = cols.filter(c => MONEY.has(c.role) || c.role === 'ref' || c.role === 'cuota').map(c => c.x).filter(x => !dateC || x > dateC.r).sort((a, b) => a - b)[0];
+        descLeft = dc ? dc.x : (dateC ? dateC.r : null);
+        descRight = firstMoney != null ? firstMoney : (dc ? dc.r + 200 : null);
+      }
+    });
+
+    // dates printed without a year take it from the latest full date on the statement
+    const ref = latestIso || null;
+    for (const r of rows) {
+      if (r.date || !r.partial) continue;
+      if (!ref) { r.flags.push('fecha sin año'); continue; }
+      const ry = +ref.slice(0, 4), rm = +ref.slice(5, 7);
+      const y = r.partial.m > rm + 1 ? ry - 1 : ry;
+      r.date = validDate(r.partial.d, r.partial.m, y);
+    }
+    for (const r of rows) delete r.partial;
+
+    const kind = rows.some(r => r.ars != null || r.usd != null) ? 'tarjeta' : 'cuenta';
+    // signed amount of every movement (credits positive, debits negative) for bank accounts
+    if (kind === 'cuenta') {
+      for (const r of rows) {
+        if (r.amount == null && (r.debit != null || r.credit != null)) r.amount = r2((r.credit || 0) - Math.abs(r.debit || 0));
+        if (r.debit != null && r.debit < 0) r.debit = Math.abs(r.debit);
+        // a single signed "Importe" column: split it into debit and credit for the spreadsheet
+        if (r.debit == null && r.credit == null && r.amount != null) { if (r.amount < 0) r.debit = -r.amount; else r.credit = r.amount; }
+      }
+    }
+    // card statements: what each line is, so purchases can be checked against the statement's own "Total consumos"
+    if (kind === 'tarjeta') for (const r of rows) r.type = (r.ars || 0) < 0 || (r.usd || 0) < 0 ? 'pago' : (r.ref || r.cuota) ? 'consumo' : 'cargo';
+    const check = kind === 'cuenta' ? checkAccount(rows, summary.ars) : checkCard(rows, summary);
+    if (!rows.length) warnings.push('No se encontraron movimientos. Puede que el formato de este resumen todavía no esté soportado.');
+    return { kind, rows, summary, check, warnings, issuer: detectIssuer(allText.join('\n')) };
+  }
+
+  // Bank account: every running balance must follow from the one before it, and the last one must be the closing balance.
+  function checkAccount(rows, s) {
+    const withBal = rows.filter(r => r.balance != null);
+    let opening = s.opening, derivedOpening = false;
+    if (opening == null && withBal.length && withBal[0] === rows[0] && rows[0].amount != null) { opening = r2(rows[0].balance - rows[0].amount); derivedOpening = true; }
+    const sum = r2(rows.reduce((a, r) => a + (r.amount || 0), 0));
+    let prev = opening, breaks = 0;
+    for (const r of rows) {
+      if (r.amount == null) { r.flags.push('sin importe'); continue; }
+      if (prev != null) prev = r2(prev + r.amount);
+      if (r.balance != null) {
+        if (prev != null && Math.abs(prev - r.balance) > 0.011) { r.flags.push('el saldo no coincide con el anterior más este movimiento'); breaks++; }
+        prev = r.balance;
+      }
+    }
+    const closing = s.closing != null ? s.closing : (withBal.length ? withBal[withBal.length - 1].balance : null);
+    const result = { opening, closing, sum, expected: opening != null ? r2(opening + sum) : null, breaks, derivedOpening, closingFromRows: s.closing == null };
+    if (opening == null || closing == null) result.state = 'no-total';
+    else result.state = Math.abs(result.expected - closing) <= 0.011 && !breaks ? 'ok' : 'mismatch';
+    if (s.total_debits != null) result.totalDebits = { statement: Math.abs(s.total_debits), read: r2(rows.reduce((a, r) => a + Math.abs(r.debit || 0), 0)) };
+    if (s.total_credits != null) result.totalCredits = { statement: s.total_credits, read: r2(rows.reduce((a, r) => a + (r.credit || 0), 0)) };
+    if (result.totalDebits && Math.abs(result.totalDebits.statement - result.totalDebits.read) > 0.011) result.state = 'mismatch';
+    if (result.totalCredits && Math.abs(result.totalCredits.statement - result.totalCredits.read) > 0.011) result.state = 'mismatch';
+    return result;
+  }
+
+  // Credit card: previous balance + every movement (purchases, payments, taxes) = new balance, in pesos and in dollars.
+  function checkCard(rows, s) {
+    const one = (cur) => {
+      const key = cur === 'usd' ? 'usd' : 'ars';
+      const used = rows.some(r => r[key] != null) || s[key].closing != null;
+      if (!used) return null;
+      const sum = r2(rows.reduce((a, r) => a + (r[key] || 0), 0));
+      const opening = s[key].opening != null ? s[key].opening : null, closing = s[key].closing != null ? s[key].closing : null;
+      const expected = opening != null ? r2(opening + sum) : null;
+      const part = t => r2(rows.filter(r => r.type === t).reduce((a, r) => a + (r[key] || 0), 0));
+      const consumos = part('consumo'), cargos = part('cargo'), pagos = r2(-part('pago'));
+      const subtotal = s[key].subtotal != null ? s[key].subtotal : null;   // "Total consumos" printed on the statement
+      let state = opening == null || closing == null ? 'no-total' : Math.abs(expected - closing) <= 0.011 ? 'ok' : 'mismatch';
+      if (subtotal != null && Math.abs(subtotal - consumos) > 0.011 && state === 'ok') state = 'mismatch';
+      return { opening, closing, sum, expected, state, consumos, cargos, pagos, subtotal };
+    };
+    const ars = one('ars'), usd = one('usd');
+    const parts = [ars, usd].filter(Boolean);
+    const state = parts.some(p => p.state === 'mismatch') ? 'mismatch' : parts.length && parts.every(p => p.state === 'ok') ? 'ok' : 'no-total';
+    return { ars, usd, state };
+  }
+
+  const api = { parse, parseAmount, isAmount, readDate, toLines, readHeader, summaryKind, detectIssuer };
+  if (typeof module !== 'undefined' && module.exports) module.exports = api; else root.ResumenParser = api;
+})(typeof self !== 'undefined' ? self : this);

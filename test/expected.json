@@ -1,0 +1,44 @@
+{
+ "sample_cuenta.pdf": {
+  "kind": "cuenta",
+  "rows": 70,
+  "opening": 152340.55,
+  "closing": 1014922.04,
+  "debits": 2226639.87,
+  "credits": 3089221.36
+ },
+ "sample_cuenta_importe.pdf": {
+  "kind": "cuenta",
+  "rows": 45,
+  "opening": 8400.1,
+  "closing": 1090285.3,
+  "debits": 1594192.0,
+  "credits": 2676077.2
+ },
+ "sample_tarjeta.pdf": {
+  "kind": "tarjeta",
+  "rows": 43,
+  "ars": {
+   "opening": 245780.4,
+   "closing": 1752762.77
+  },
+  "usd": {
+   "opening": 35.2,
+   "closing": 116.33
+  },
+  "cuotas": 12
+ },
+ "sample_tarjeta_consolidado.pdf": {
+  "kind": "tarjeta",
+  "rows": 17,
+  "ars": {
+   "opening": 523480.15,
+   "closing": 131248.15
+  },
+  "usd": {
+   "opening": 12.4,
+   "closing": 16.43
+  },
+  "cuotas": 2
+ }
+}

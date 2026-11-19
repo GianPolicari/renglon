@@ -1,0 +1,47 @@
+<!doctype html>
+<html lang="es-AR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Preguntas frecuentes | Renglón</title>
+<meta name="description" content="Cómo funciona el conversor de resúmenes bancarios y de tarjeta a Excel, qué lee y por qué tu archivo no se sube.">
+<link rel="canonical" href="https://renglon.com.ar/preguntas/">
+<meta property="og:url" content="https://renglon.com.ar/preguntas/">
+<meta property="og:type" content="website">
+<meta property="og:site_name" content="Renglón">
+<meta property="og:title" content="Preguntas frecuentes | Renglón">
+<meta property="og:description" content="Cómo funciona el conversor de resúmenes bancarios y de tarjeta a Excel, qué lee y por qué tu archivo no se sube.">
+<meta property="og:locale" content="es_AR">
+<link rel="icon" href="/favicon.svg" type="image/svg+xml">
+<link rel="preload" href="/assets/fonts/plex-sans-latin-wght.woff2" as="font" type="font/woff2" crossorigin>
+<link rel="preload" href="/assets/fonts/source-serif-4-latin-wght.woff2" as="font" type="font/woff2" crossorigin>
+<link rel="stylesheet" href="/assets/site.css">
+</head>
+<body data-software="other" data-page="/preguntas" class="prose">
+<header class="mast"><div class="in">
+  <a class="logo" href="/"><b>Renglón</b><small>Resúmenes bancarios y de tarjeta, sin subir tu archivo</small></a>
+  <nav class="nav" aria-label="Secciones"><a href="/">Convertir</a><a href="/preguntas/">Preguntas frecuentes</a></nav>
+</div></header>
+<div class="wrap">
+  <main>
+  <h1>Preguntas frecuentes</h1>
+  <section class="faq">
+    <details><summary>¿Qué hace?</summary><p>Lee el PDF del resumen de tu cuenta bancaria o de tu tarjeta de crédito, arma una fila por cada movimiento y controla que el saldo anterior más los movimientos dé el saldo final del resumen. Después lo bajás en Excel (.xlsx) o en .csv.</p></details>
+    <details><summary>¿Mi resumen se sube a algún lado?</summary><p>No. El PDF se abre y se convierte dentro de tu navegador. Nunca llega a nuestro servidor y no vemos nombres, números de cuenta, CBU ni importes. Para comprobarlo: cargá la página, cortá internet (modo avión) y convertí un resumen: funciona igual. Además, la página le prohíbe al navegador conectarse a otros sitios (su política de seguridad solo permite renglon.com.ar). Con conexión, lo único que se envía son contadores anónimos de uso: qué banco, cuántas filas y si el saldo cerró.</p></details>
+    <details><summary>¿Qué bancos y tarjetas lee?</summary><p>Lee los títulos de las columnas del resumen (Fecha, Concepto, Débitos, Créditos, Saldo, Pesos, Dólares) en lugar de usar una plantilla fija, así que muchos formatos deberían andar. Todavía está en prueba: por ahora lo probamos con resúmenes de ejemplo. Si el tuyo no sale bien, podés mandarnos su diseño sin tus datos desde la misma página.</p></details>
+    <details><summary>¿Qué pasa si los saldos no coinciden?</summary><p>Te mostramos en qué movimiento se corta la cuenta. Suele pasar cuando una línea del PDF tiene un formato distinto. No uses ese Excel sin revisar: compará esas filas con el resumen.</p></details>
+    <details><summary>¿Sirve para la tarjeta de crédito?</summary><p>Sí. Separa pesos y dólares, detecta las cuotas (por ejemplo 03/06), incluye pagos, impuestos y cargos, y controla que el saldo anterior más todo eso dé el saldo actual en cada moneda.</p></details>
+    <details><summary>¿Lee resúmenes escaneados o fotos?</summary><p>No. Hace falta el PDF original que baja el home banking, que trae el texto adentro. Un escaneo o una foto no se pueden leer sin reconocimiento de imágenes.</p></details>
+    <details><summary>¿Cuesta algo?</summary><p>No. Es gratis y no hace falta crear una cuenta.</p></details>
+    <details><summary>¿Es asesoramiento contable?</summary><p>No. Es una herramienta para pasar datos de un formato a otro. Revisá siempre el resultado contra el resumen original.</p></details>
+  </section>
+  </main>
+</div>
+<footer class="foot"><div class="in">
+  <nav aria-label="Más"><a href="/preguntas/">Preguntas frecuentes</a><a href="/privacidad/">Privacidad</a><a href="/terminos/">Términos</a><a href="mailto:gianfrancopolicari@gmail.com">Contacto</a></nav>
+  <p>Renglón convierte datos; no es asesoramiento contable ni impositivo. Revisá el resultado contra tu resumen.</p>
+</div></footer>
+<script src="/assets/chrome.js"></script>
+<script src="/telemetry.js"></script>
+</body>
+</html>
