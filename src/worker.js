@@ -15,7 +15,7 @@ const OUTCOMES = new Set(['ok', 'mismatch', 'no_total', 'no_rows', 'no_text', 'e
 // kind of statement: bank account or credit card
 const SOFTWARE = new Set(['cuenta', 'tarjeta', 'other']);
 // issuer detected in the PDF (column name kept as 'broker' to share the admin panel code)
-const BROKERS = new Set(['galicia', 'santander', 'nacion', 'provincia', 'bbva', 'macro', 'ciudad', 'icbc', 'supervielle', 'patagonia', 'credicoop', 'hipotecario', 'comafi', 'columbia', 'brubank', 'uala', 'mercadopago', 'naranjax', 'amex', 'visa', 'mastercard', 'cabal', 'sample', 'unknown']);
+const BROKERS = new Set(['galicia', 'santander', 'nacion', 'provincia', 'bbva', 'macro', 'ciudad', 'icbc', 'supervielle', 'patagonia', 'credicoop', 'hipotecario', 'comafi', 'columbia', 'brubank', 'arq', 'uala', 'mercadopago', 'naranjax', 'amex', 'visa', 'mastercard', 'cabal', 'sample', 'unknown']);
 const FORMATS = new Set(['xlsx', 'csv']);
 const PAGES = new Set(['/', '/admin', '/preguntas', '/privacidad', '/terminos', '/404']);
 const REF_SOURCES = new Set(['direct', 'google', 'bing', 'duckduckgo', 'reddit', 'facebook', 'instagram', 'linkedin', 'x', 'youtube', 'whatsapp', 'chatgpt', 'perplexity', 'email', 'other']);

@@ -58,5 +58,15 @@
   "rows": 30,
   "opening": 150000.0,
   "closing": -806864.63
+ },
+ "billetera": {
+  "rows": 24,
+  "opening": 0.0,
+  "closing": 175.24
+ },
+ "billetera_chars": {
+  "rows": 24,
+  "opening": 0.0,
+  "closing": 175.24
  }
 }

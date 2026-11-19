@@ -7,7 +7,7 @@
   // ---- amounts -------------------------------------------------------------------------------
   // Argentine format 1.234.567,89; also 1234,56, -1.234,56, 1.234,56-, (1.234,56) and $ prefixes.
   // A US-format amount (1,234.56) is accepted only when it cannot be Argentine.
-  const AMOUNT_RE = /^\(?[-−]?(?:\$|U\$S|US\$|USD)?\s?[-−]?(?:\d{1,3}(?:\.\d{3})+|\d+),\d{2}[-−]?\)?$|^\(?[-−]?\$?\d{1,3}(?:,\d{3})+\.\d{2}[-−]?\)?$/;
+  const AMOUNT_RE = /^\(?[-−]?(?:\$|U\$S|US\$|USD)?\s?[-−]?(?:\d{1,3}(?:\.\d{3})+|\d+),\d{2}[-−]?\)?$|^\(?[-−]?(?:\$|U\$S|US\$|USD)?\s?[-−]?(?:\d{1,3}(?:,\d{3})+|\d+)\.\d{2}[-−]?\)?$/;
   function parseAmount(s) {
     if (s == null) return null;
     let t = String(s).trim().replace(/−/g, '-').replace(/^(?:U\$S|US\$|USD|\$)\s?/, '');
@@ -20,7 +20,7 @@
     t = t.replace(/^(?:U\$S|US\$|USD|\$)\s?/, '');
     let v;
     if (/^(?:\d{1,3}(?:\.\d{3})+|\d+),\d{2}$/.test(t)) v = Number(t.replace(/\./g, '').replace(',', '.'));
-    else if (/^\d{1,3}(?:,\d{3})+\.\d{2}$/.test(t)) v = Number(t.replace(/,/g, ''));
+    else if (/^(?:\d{1,3}(?:,\d{3})+|\d+)\.\d{2}$/.test(t)) v = Number(t.replace(/,/g, ''));
     else return null;
     if (!isFinite(v)) return null;
     return Math.round((neg ? -v : v) * 100) / 100;
@@ -40,21 +40,46 @@
     return dt.getUTCMonth() === m - 1 ? `${y}-${String(m).padStart(2, '0')}-${String(d).padStart(2, '0')}` : null;
   }
   // Date at the start of a line: returns { iso | partial: {d, m}, used } where used = tokens consumed.
+  const monthOf = w => { const k = String(w || '').toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/[.,]$/, ''); return /^[a-z]{3,10}$/.test(k) ? MONTHS[k.slice(0, 3)] || null : null; };
+  const WEEKDAY = /^(lunes|martes|miercoles|jueves|viernes|sabado|domingo|lun|mie|jue|vie|sab|dom)[.,]?$/;
+  const DATE_ISO = /^(\d{4})[\/\-.](\d{1,2})[\/\-.](\d{1,2})$/;                       // 2026-11-19
+  // A date at the start of the token list. Returns { iso | partial: {d, m}, used } where used = tokens consumed.
   function readDate(tokens) {
     if (!tokens.length) return null;
-    const a = tokens[0].s, b = tokens[1] && tokens[1].s, c = tokens[2] && tokens[2].s;
+    const clean = s => (s == null ? s : String(s).replace(/[,;:]$/, ''));
+    // "Martes 19 de noviembre" / "Mar. 19/11": a weekday name before the date
+    const w0 = String(tokens[0].s).toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '');
+    if (tokens.length > 1 && (WEEKDAY.test(w0) || (/^mar[.,]?$/.test(w0) && /^\d{1,2}/.test(tokens[1].s)))) {
+      const r = readDate(tokens.slice(1));
+      return r ? Object.assign(r, { used: r.used + 1 }) : null;
+    }
+    const a = clean(tokens[0].s), b = clean(tokens[1] && tokens[1].s), c = clean(tokens[2] && tokens[2].s);
+    const d4 = clean(tokens[3] && tokens[3].s), e = clean(tokens[4] && tokens[4].s);
     let m;
     if ((m = DATE_FULL.exec(a))) { const iso = validDate(+m[1], +m[2], fullYear(+m[3])); return iso ? { iso, used: 1 } : null; }
+    if ((m = DATE_ISO.exec(a))) { const iso = validDate(+m[3], +m[2], +m[1]); return iso ? { iso, used: 1 } : null; }
     if ((m = DATE_MON.exec(a)) && MONTHS[m[2].toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '').slice(0, 3)]) {
       const mo = MONTHS[m[2].toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '').slice(0, 3)];
       if (m[3]) { const iso = validDate(+m[1], mo, fullYear(+m[3])); return iso ? { iso, used: 1 } : null; }
       return { partial: { d: +m[1], m: mo }, used: 1 };
     }
-    // "05 Oct 26" or "05 Oct" written as separate words
-    if (/^\d{1,2}$/.test(a) && b && MONTHS[b.toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/\.$/, '').slice(0, 3)] && /^[A-Za-zÁÉÍÓÚáéíóú.]{3,5}$/.test(b)) {
-      const mo = MONTHS[b.toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '').slice(0, 3)];
+    // "19 de noviembre de 2026" / "19 de noviembre"
+    if (/^\d{1,2}$/.test(a) && /^de$/i.test(b || '') && monthOf(c)) {
+      const mo = monthOf(c);
+      if (/^de$/i.test(d4 || '') && /^\d{4}$/.test(e || '')) { const iso = validDate(+a, mo, +e); return iso ? { iso, used: 5 } : null; }
+      return { partial: { d: +a, m: mo }, used: 3 };
+    }
+    // "05 Oct 26", "19 nov. 2026" or "05 Oct" written as separate words
+    if (/^\d{1,2}$/.test(a) && monthOf(b) && /^[A-Za-zÁÉÍÓÚáéíóú.]{3,11}$/.test(b)) {
+      const mo = monthOf(b);
       if (c && /^(\d{2}|\d{4})$/.test(c)) { const iso = validDate(+a, mo, fullYear(+c)); return iso ? { iso, used: 3 } : null; }
       return { partial: { d: +a, m: mo }, used: 2 };
+    }
+    // "Nov 19, 2026" / "noviembre 19"
+    if (monthOf(a) && /^\d{1,2}$/.test(b || '')) {
+      const mo = monthOf(a);
+      if (c && /^\d{4}$/.test(c)) { const iso = validDate(+b, mo, +c); return iso ? { iso, used: 3 } : null; }
+      return { partial: { d: +b, m: mo }, used: 2 };
     }
     if ((m = DATE_SHORT.exec(a))) { const d = +m[1], mo = +m[2]; if (d >= 1 && d <= 31 && mo >= 1 && mo <= 12) return { partial: { d, m: mo }, used: 1 }; }
     return null;
@@ -76,6 +101,16 @@
     }
     return lines;
   }
+  // a bare number after an explicit sign: 35.2, 100, 56,689.95, 95.696,6 (the last separator with 1-2 digits is the decimal one)
+  function signedNumber(s) {
+    if (!/^\d[\d.,]*$/.test(s)) return null;
+    const last = Math.max(s.lastIndexOf(','), s.lastIndexOf('.'));
+    const dec = last >= 0 && s.length - last - 1 <= 2 ? s.slice(last + 1) : '';
+    const int = (dec ? s.slice(0, last) : s).replace(/[.,]/g, '');
+    if (!/^\d+$/.test(int) || int.length > 12) return null;
+    return Number(int + '.' + (dec || '0'));
+  }
+  const fmtAr = v => (v < 0 ? '-' : '') + Math.abs(v).toFixed(2).replace(/\B(?=(\d{3})+\.)/g, '#').replace('.', ',').replace(/#/g, '.');
   function words(items) {
     const out = [];
     for (const it of items) {
@@ -87,6 +122,7 @@
     const merged = [];
     for (let i = 0; i < out.length; i++) {
       const t = out[i], n = out[i + 1];
+      if (n && /^[+\-−]$/.test(t.s) && n.x - t.r < 10) { const v = signedNumber(n.s); if (v != null) { merged.push({ s: fmtAr(t.s === '+' ? v : -v), x: t.x, r: n.r }); i++; continue; } }
       if (n && /^[-−]?(?:\$|U\$S|US\$|USD)$/.test(t.s) && isAmount(n.s) && n.x - t.r < 14) { merged.push({ s: t.s + ' ' + n.s, x: t.x, r: n.r, cur: /^[-−]?\$$/.test(t.s) ? 'ARS' : 'USD' }); i++; continue; }
       if (n && isAmount(t.s) && /^[-−]$/.test(n.s) && n.x - t.r < 6) { merged.push({ s: t.s + '-', x: t.x, r: n.r }); i++; continue; }
       merged.push(t);
@@ -115,10 +151,10 @@
   // A heading line names a date column and at least one money column.
   function readHeader(line) {
     if (line.tokens.some(t => isAmount(t.s))) return null;   // a heading has words, not amounts
-    const cols = [];
+    const cols = [], others = [];
     for (const t of line.tokens) {
       const role = roleOf(t.s);
-      if (!role) continue;
+      if (!role) { others.push({ x: t.x, r: t.r, c: (t.x + t.r) / 2 }); continue; }
       const prev = cols.length ? cols[cols.length - 1] : null;
       if (prev && prev.role === role) { prev.r = t.r; continue; }         // "Saldo" "Saldos" side by side
       cols.push({ role, x: t.x, r: t.r, c: (t.x + t.r) / 2 });
@@ -127,11 +163,13 @@
     const money = cols.filter(c => MONEY.has(c.role)).length;
     if (!money || cols.length < 2) return null;
     if (!roles.has('date') && money < 2) return null;      // "PESOS DÓLARES" alone is a heading too
+    cols.others = others;
     // "Saldo en $" or "Débitos $" on a bank account: the "$" names the currency, not a pesos column
-    if (roles.has('ars') && !roles.has('usd') && (roles.has('debit') || roles.has('credit') || roles.has('balance'))) return cols.filter(c => c.role !== 'ars');
+    if (roles.has('ars') && !roles.has('usd') && (roles.has('debit') || roles.has('credit') || roles.has('balance'))) return keep(cols.filter(c => c.role !== 'ars'));
     // "Importe" next to "Pesos"/"Dólares" headings is a group title, not a column of its own
-    if (roles.has('ars') || roles.has('usd')) return cols.filter(c => c.role !== 'amount');
+    if (roles.has('ars') || roles.has('usd')) return keep(cols.filter(c => c.role !== 'amount'));
     return cols;
+    function keep(list) { list.others = others; return list; }
   }
   // Which money column an amount belongs to: amounts are right-aligned under their heading.
   function moneyColumn(cols, tok) {
@@ -142,13 +180,15 @@
       const d = Math.min(Math.abs(tok.r - c.r), Math.abs((tok.x + tok.r) / 2 - c.c));
       if (d < bd) { bd = d; best = c; }
     }
+    // closer to a heading that is not a money column (e.g. "Equivalente"): it belongs there
+    if (best && cols.others && cols.others.some(o => Math.min(Math.abs(tok.r - o.r), Math.abs((tok.x + tok.r) / 2 - o.c)) < bd - 4 && o.x > best.r)) return null;
     return best;
   }
 
   // ---- summary lines -------------------------------------------------------------------------
   const SUMMARY = [
-    ['opening', /saldo (anterior|inicial|al inicio)|saldo del (resumen|periodo) anterior|saldo ultimo resumen/],
-    ['closing', /saldo (final|actual|al cierre|a la fecha|total)|saldo al\b|nuevo saldo|saldo del periodo|total a pagar|saldo de cierre/],
+    ['opening', /balance (de inicio|inicial)|saldo (anterior|inicial|al inicio)|saldo del (resumen|periodo) anterior|saldo ultimo resumen/],
+    ['closing', /balance final|saldo (final|actual|al cierre|a la fecha|total)|saldo al\b|nuevo saldo|saldo del periodo|total a pagar|saldo de cierre/],
     ['total_debits', /total (de )?(debitos|debe|egresos)/],
     ['total_credits', /total (de )?(creditos|haber|ingresos)/],
     ['minimum', /pago minimo/],
@@ -168,7 +208,7 @@
     ['provincia', /banco provincia|bancoprovincia|provincia de buenos aires/i], ['bbva', /bbva|franc[eé]s/i], ['macro', /banco macro|\bmacro\b/i],
     ['ciudad', /banco ciudad|ciudad de buenos aires/i], ['icbc', /icbc/i], ['supervielle', /supervielle/i], ['patagonia', /patagonia/i],
     ['credicoop', /credicoop/i], ['hipotecario', /hipotecario/i], ['comafi', /comafi/i], ['columbia', /banco columbia/i],
-    ['brubank', /brubank/i], ['uala', /ual[aá]/i], ['mercadopago', /mercado ?pago/i], ['naranjax', /naranja/i],
+    ['brubank', /brubank/i], ['arq', /arqfinance|d[oó]larapp|\barq\b/i], ['uala', /ual[aá]/i], ['mercadopago', /mercado ?pago/i], ['naranjax', /naranja/i],
     ['amex', /american express|\bamex\b/i], ['cabal', /cabal/i], ['mastercard', /mastercard/i], ['visa', /\bvisa\b/i],
     ['sample', /banco ejemplo|ejemplo s\.a\.|resumen sint[eé]tico/i],
   ];
@@ -188,7 +228,7 @@
 
   function parse(pages) {
     const rows = [], warnings = [], summary = { ars: {}, usd: {} };
-    let cols = null, last = null, latestIso = null;
+    let cols = null, last = null, latestIso = null, groupDate = null, refIso = null;
     const allText = [];
     const stats = { headers: 0, dateLines: 0, chars: 0, plain: 0 };   // only to say why nothing was read
 
@@ -201,10 +241,15 @@
         const ln = lines[li];
         const h = readHeader(ln);
         if (h) { cols = h; last = null; stats.headers++; setDescBounds(); continue; }
-        if (!cols) continue;
+        if (!refIso) for (let k = 0; k < ln.tokens.length; k++) { const dd = readDate(ln.tokens.slice(k)); if (dd && dd.iso) { refIso = dd.iso; break; } }
+        if (!cols) {
+          const sk = summaryKind(ln.text), am = ln.tokens.filter(t => isAmount(t.s));
+          if ((sk === 'opening' || sk === 'closing') && am.length === 1 && summary.ars[sk] == null) summary.ars[sk] = parseAmount(am[0].s);
+          continue;
+        }
         let toks = ln.tokens;
         if (CARRY_RE.test(ln.text.replace(LEADING_DATE, ''))) continue;
-        if (dateOnly(ln)) { stats.dateLines++; continue; }      // a date alone on its line belongs to the movement beside it
+        if (dateOnly(ln)) { stats.dateLines++; groupDate = dateOnly(ln); continue; }   // a date alone: for the movement beside it, or for the ones under it
         // the date may not be the first word (a code before it): take the one under the "Fecha" heading
         if (!readDate(toks)) {
           const dc = cols.find(c => c.role === 'date');
@@ -260,6 +305,7 @@
         // the date printed on its own line, centred on a two-line movement (Santander and others)
         let nd = null;
         for (const j of [li + 1, li - 1]) { const o = lines[j]; if (o && Math.abs(o.y - ln.y) <= 10 && dateOnly(o)) { nd = dateOnly(o); break; } }
+        if (!nd && groupDate && (!last || groupDate !== last.groupDate)) nd = groupDate;
         if (amounts.some(t => moneyColumn(cols, t)) && (last || nd) && toks.some(t => !isAmount(t.s)) && !kind) {
           // taxes and charges printed under the last movement without a date (common on card statements)
           const row = nd
@@ -288,7 +334,7 @@
     });
 
     // dates printed without a year take it from the latest full date on the statement
-    const ref = latestIso || null;
+    const ref = latestIso || refIso || null;
     for (const r of rows) {
       if (r.date || !r.partial) continue;
       if (!ref) { r.flags.push('fecha sin año'); continue; }

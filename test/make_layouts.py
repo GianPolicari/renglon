@@ -112,3 +112,39 @@ if __name__ == '__main__':
         for k, v in build(suf).items(): exp[k + suf] = v
     json.dump(exp, open(os.path.join(OUT, 'expected.json'), 'w'), indent=1)
     print(len(exp), 'layouts')
+
+
+def wallet(path):
+    """Dollar wallet statement (ARQ style): summary above the table in US format, month-first dates without a year,
+    signed amounts with 0-2 decimals ("+ 35.2", "- 100"), and a local-currency amount under a heading that is not a money column."""
+    c = CharCanvas(os.path.join(OUT, path), pagesize=A4); rnd = random.Random(7)
+    rows, total_in, total_out = [], 0.0, 0.0
+    for i in range(24):
+        amt = round(rnd.uniform(2, 60), rnd.choice([0, 1, 2]))
+        sign = 1 if i % 3 != 2 else -1
+        if sign < 0: amt = rows[-1][1]   # spend what was just bought
+        rows.append((f"Oct {3 + i:02d}", amt * sign)); total_in += amt if sign > 0 else 0; total_out += amt if sign < 0 else 0
+    c.setFont('Helvetica', 9)
+    c.drawString(40, H - 60, 'Billetera Ejemplo - Estado de Cuenta (datos inventados)')
+    c.drawString(40, H - 120, 'Fecha de inicio'); c.drawString(160, H - 120, '1 October 2026')
+    c.drawString(330, H - 120, 'Balance de inicio'); c.drawString(450, H - 120, '$ 0.00')
+    c.drawString(330, H - 134, 'Ingresos'); c.drawString(450, H - 134, '$ ' + f'{total_in:,.2f}')
+    c.drawString(330, H - 148, 'Balance Final'); c.drawString(450, H - 148, '$ ' + f'{total_in - total_out:,.2f}')
+    y = H - 200
+    c.drawString(330, y + 22, 'Moneda'); c.drawString(400, y + 11, 'Monto Local')
+    for lab, x in (('Fecha', 40), ('Tipo', 100), ('Monto', 250), ('Equivalente', 330), ('Equivalente', 400), ('Descripción', 480)): c.drawString(x, y, lab)
+    y -= 18
+    for d, v in rows:
+        c.drawString(40, y, d); c.drawString(100, y, 'Compra' if v > 0 else 'Venta')
+        c.drawString(250, y, ('+ ' if v > 0 else '- ') + (f'{abs(v):g}'))
+        c.drawString(330, y, 'ARS'); c.drawString(400, y, ('+ ' if v > 0 else '- ') + f'{abs(v) * 1650:,.2f}'.rstrip('0').rstrip('.'))
+        c.drawString(480, y, 'Conversion de ejemplo'); y -= 16
+    c.save()
+    return {'rows': len(rows), 'opening': 0.0, 'closing': round(total_in - total_out, 2)}
+
+if __name__ == '__main__':
+    e = json.load(open(os.path.join(OUT, 'expected.json')))
+    for cw, suf in ((False, ''), (True, '_chars')):
+        CHARWISE = cw
+        e['billetera' + suf] = wallet('billetera' + suf + '.pdf')
+    json.dump(e, open(os.path.join(OUT, 'expected.json'), 'w'), indent=1)
