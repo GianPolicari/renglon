@@ -386,5 +386,15 @@
     "rows": 5
    }
   ]
+ },
+ "galicia_cuenta": {
+  "rows": 24,
+  "opening": 40000.0,
+  "closing": -179115.09
+ },
+ "galicia_cuenta_chars": {
+  "rows": 24,
+  "opening": 40000.0,
+  "closing": -179115.09
  }
 }

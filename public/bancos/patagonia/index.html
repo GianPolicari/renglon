@@ -1,0 +1,123 @@
+<!doctype html>
+<html lang="es-AR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Resumen de Banco Patagonia a Excel, gratis | Renglón</title>
+<meta name="description" content="Pasá el resumen PDF de tu Banco Patagonia a Excel con un movimiento por fila y control de saldos. Gratis y sin subir el archivo.">
+<link rel="canonical" href="https://renglon.com.ar/bancos/patagonia/">
+<meta property="og:url" content="https://renglon.com.ar/bancos/patagonia/">
+<meta property="og:type" content="website">
+<meta property="og:site_name" content="Renglón">
+<meta property="og:title" content="Resumen de Banco Patagonia a Excel, gratis | Renglón">
+<meta property="og:description" content="Pasá el resumen PDF de tu Banco Patagonia a Excel con un movimiento por fila y control de saldos. Gratis y sin subir el archivo.">
+<meta property="og:locale" content="es_AR">
+<meta property="og:image" content="https://renglon.com.ar/og.png">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
+<meta property="og:image:alt" content="Renglón: tu resumen bancario o de tarjeta, de PDF a Excel">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="theme-color" content="#102a43">
+<link rel="icon" href="/favicon.ico" sizes="48x48">
+<link rel="icon" href="/favicon.svg" type="image/svg+xml">
+<link rel="apple-touch-icon" href="/apple-touch-icon.png">
+<link rel="preload" href="/assets/fonts/plex-sans-latin-wght.woff2" as="font" type="font/woff2" crossorigin>
+<link rel="preload" href="/assets/fonts/source-serif-4-latin-wght.woff2" as="font" type="font/woff2" crossorigin>
+<link rel="stylesheet" href="/assets/site.css">
+</head>
+<body data-software="other" data-page="/bancos/patagonia">
+<header class="mast"><div class="in">
+  <a class="logo" href="/"><b>Renglón</b><small>Resúmenes bancarios y de tarjeta, sin subir tu archivo</small></a>
+  <nav class="nav" aria-label="Secciones"><a href="/">Convertir</a><a href="/bancos/">Bancos</a><a href="/preguntas/">Preguntas</a></nav>
+</div></header>
+<div class="wrap">
+  <main>
+  <div class="hero">
+    <div>
+      <h1>Resumen de Banco Patagonia a Excel</h1>
+      <p class="lede">Pasá el resumen PDF de tu Banco Patagonia a Excel, con un movimiento por fila y los saldos controlados. Gratis, y el archivo se lee en tu navegador: nunca se sube a ningún servidor.</p>
+      <dl class="facts">
+        <div><dt>Privado</dt><dd>El archivo no sale de tu computadora ni de tu celular.</dd></div>
+        <div><dt>Controlado</dt><dd>Saldo anterior más movimientos tiene que dar el saldo final. Si no da, te marcamos dónde.</dd></div>
+        <div><dt>Listo para usar</dt><dd>Fechas como fechas e importes como números. Cuotas, pesos y dólares por separado.</dd></div>
+      </dl>
+    </div>
+    <div class="panel">
+      <h2>Convertir un resumen</h2>
+      <p>Cuentas en pesos o en dólares y tarjetas de crédito. Gratis y sin registrarte.</p>
+      <label class="drop" id="drop" tabindex="0">
+        <input type="file" id="file" accept="application/pdf">
+        <strong>Arrastrá el PDF acá</strong>
+        <small>El original del home banking, no una foto ni un escaneo. Hasta 25 MB.</small>
+        <span class="btn primary">Elegir archivo</span>
+      </label>
+      <p class="samples">¿No tenés uno a mano? Probá un ejemplo inventado: <button class="linkbtn" id="demo1">cuenta con débitos y créditos</button>, <button class="linkbtn" id="demo2">cuenta con importe y saldo</button> o <button class="linkbtn" id="demo3">tarjeta de crédito</button>.</p>
+    </div>
+  </div>
+  <div id="status" role="status" aria-live="polite"></div>
+  <p class="notice" id="sampleNote" hidden></p>
+
+  <section class="step" id="results" hidden>
+    <h2>Conciliación</h2>
+    <div class="sum" id="sum"></div>
+    <div class="feedback" id="tfb" hidden><span class="fbq">¿Los saldos coinciden con tu resumen?</span><button data-tfb="totals_match">Sí</button><button data-tfb="totals_differ">No</button></div>
+  </section>
+
+  <section class="step" id="warnCard" hidden>
+    <h2>Revisá antes de usarlo</h2>
+    <ul class="warn" id="warns"></ul>
+  </section>
+
+  <section class="step" id="layoutCard" hidden>
+    <h2>Ayudanos a leer este resumen</h2>
+    <p><span id="layoutWhy">Este formato no se pudo leer completo. Podés mandarnos </span><b>solo su diseño</b>: las palabras de los títulos de las columnas (como "Fecha" o "Saldo"), cada otra palabra cambiada por T y cada número por 9, y dónde está cada valor en la página. Nada de nombres, CBU, números de cuenta ni importes.</p>
+    <div class="row"><button class="primary" id="layoutSend">Mandar el diseño</button><button class="linkbtn" id="layoutShow">Ver exactamente qué se manda</button></div>
+    <p class="notice" id="layoutMsg" role="status"></p>
+    <pre class="layoutpre" id="layoutPreview" hidden></pre>
+  </section>
+
+  <section class="step" id="dlCard" hidden>
+    <h2>Bajalo</h2>
+    <div class="row"><button class="primary" id="dlX">Bajar en Excel (.xlsx)</button><button id="dlC">.csv en su lugar</button></div>
+    <p class="notice">El Excel trae las fechas como fechas y los importes como números, listos para sumar o filtrar. El .csv usa punto y coma y coma decimal, como lo espera Excel en español.</p>
+    <p class="notice"><span class="badge warn">Beta</span> Está probado con resúmenes reales de algunos bancos y con ejemplos inventados del diseño de otros. Compará los saldos con tu resumen antes de usarlo.</p>
+  </section>
+
+  <details class="more step-gap" id="rowsCard" hidden>
+    <summary><span>Movimientos leídos del PDF <span class="tag" id="rowCount"></span></span></summary>
+    <div class="in">
+      <div class="rowshead"><label class="tag"><input type="checkbox" id="onlyFlag"> Mostrar solo los que hay que revisar</label></div>
+      <div class="tablewrap" tabindex="0" role="region" aria-label="Movimientos leídos del PDF"><table><thead id="thead"></thead><tbody id="tbody"></tbody></table></div>
+    </div>
+  </details>
+
+  <section class="step bank">
+    <h2>El resumen de Patagonia</h2>
+    <p><span class="badge warn">Probado con ejemplos inventados</span></p>
+    <ul><li>Cuenta: probado con resúmenes inventados con el diseño de Banco Patagonia.</li></ul>
+    <h3>Qué tiene en cuenta</h3>
+    <ul><li>Dos columnas de fecha (FECHA y FECHA VALOR): se usa la primera.</li><li>Saldos negativos con el signo menos al final.</li></ul>
+    <p>Los resúmenes cambian de diseño con el tiempo. Si el tuyo no sale bien, podés mandarnos solo su diseño, sin tus datos, desde esta misma página. Renglón no está vinculado con Banco Patagonia.</p>
+    <p class="others">Otros: <a href="/bancos/galicia/">Galicia</a>, <a href="/bancos/santander/">Santander</a>, <a href="/bancos/bbva/">BBVA</a>, <a href="/bancos/macro/">Macro</a>, <a href="/bancos/nacion/">Nación</a>, <a href="/bancos/comafi/">Comafi</a>, <a href="/bancos/hipotecario/">Hipotecario</a>, <a href="/bancos/hsbc/">HSBC</a>, <a href="/bancos/mercado-pago/">Mercado Pago</a>, <a href="/bancos/arq/">ARQ</a>, <a href="/bancos/visa/">Visa</a>, <a href="/bancos/mastercard/">Mastercard</a>, <a href="/bancos/american-express/">American Express</a>, <a href="/bancos/cabal/">Cabal</a>.</p>
+  </section>
+  <section class="step how">
+    <h2>Cómo funciona</h2>
+    <ol>
+      <li><b>Bajá el PDF del home banking</b>El resumen mensual de tu cuenta o de tu tarjeta, tal como lo da el banco.</li>
+      <li><b>Soltalo en esta página</b>Se lee en tu navegador: no hay servidor que reciba el archivo.</li>
+      <li><b>Revisá la conciliación y bajá el Excel</b>Si los saldos cierran, el Excel está completo. Si no, te marcamos qué fila revisar.</li>
+    </ol>
+  </section>
+  </main>
+</div>
+<footer class="foot"><div class="in">
+  <nav aria-label="Más"><a href="/bancos/">Bancos y tarjetas</a><a href="/preguntas/">Preguntas frecuentes</a><a href="/privacidad/">Privacidad</a><a href="/terminos/">Términos</a><a href="mailto:gianfrancopolicari@gmail.com">Contacto</a></nav>
+  <p>Renglón convierte datos; no es asesoramiento contable ni impositivo. Revisá el resultado contra tu resumen.</p>
+</div></footer>
+<script src="/assets/chrome.js"></script>
+<script src="/telemetry.js"></script>
+<script src="/resumen.js"></script>
+<script src="/xlsx-lite.js"></script>
+<script src="/app.js"></script>
+</body>
+</html>

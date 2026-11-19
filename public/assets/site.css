@@ -184,3 +184,13 @@ details.more > .in{padding:0 18px 18px}
 }
 @media (prefers-reduced-motion:reduce){*{transition:none!important}}
 input[type=checkbox]{width:18px;height:18px;accent-color:var(--accent);vertical-align:-3px}
+
+/* bank pages */
+.bank ul,.banklist{margin:8px 0 14px;padding-left:20px;line-height:1.55}
+.bank li,.banklist li{margin:4px 0}
+.bank h3{font:600 17px/1.3 var(--serif);margin:18px 0 4px}
+.bank .others{color:var(--muted);font-size:14px}
+.banklist{list-style:none;padding:0}
+.banklist li{padding:10px 0;border-bottom:1px solid var(--line)}
+.banklist li a{font-weight:600}
+.banklist small{color:var(--muted)}

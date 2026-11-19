@@ -172,7 +172,7 @@ async function handleEvent(request, env) {
   const row = {
     ts: Date.now(),
     type,
-    page: pick(e.page, PAGES),
+    page: pick(e.page, PAGES) || (typeof e.page === 'string' && /^\/bancos(\/[a-z0-9-]{2,24})?$/.test(e.page) ? e.page : null),
     country: (request.cf && /^[A-Z]{2}$/.test(request.cf.country || '')) ? request.cf.country : 'XX',
     outcome: pick(e.outcome, OUTCOMES),
     error: code(e.error),

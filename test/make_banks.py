@@ -148,6 +148,10 @@ def build(suf):
     for i, m in enumerate(mv): m['ref'] = str(80000000000 + i * 7919); m['desc'] = 'Compra de dólares' if m['amt'] > 0 else 'Venta de dólares'
     out['mercadopago_usd'] = statement('mercadopago_usd' + suf + '.pdf', 'Billetera Ejemplo - Resumen de dolares', [('DETALLE DE MOVIMIENTOS DEL PERIODO', 300.0, mv)],
         heads, date=lambda d: f"{d:02d}-09-2026", amount_col=True, local=1450.0, opening='Saldo inicial', closing='Saldo final')
+    # Galicia (account): credit before debit, "Origen" column, minus after the balance
+    heads = [('Fecha', 40, 'l', 'date'), ('Descripción', 90, 'l', 'desc'), ('Origen', 300, 'l'), ('Crédito', 420, 'r', 'credit'), ('Débito', 490, 'r', 'debit'), ('Saldo', 560, 'r', 'balance')]
+    out['galicia_cuenta'] = statement('galicia_cuenta' + suf + '.pdf', 'Banco Ejemplo Naranja', [('Caja de ahorro en pesos', 40000.0, moves(24, 101, 40000.0))],
+        heads, date=std, neg='suffix', opening='Saldo anterior', closing='Saldo final')
     # Santander: pesos and dollars in the same statement, amounts with their currency sign ("$ 1.234,56", "-U$S 59,64")
     heads = [('Fecha', 40, 'l', 'date'), ('Comprobante', 90, 'l', 'ref'), ('Movimiento', 160, 'l', 'desc'), ('Débito', 400, 'r', 'debit'), ('Crédito', 470, 'r', 'credit'), ('Saldo en cuenta', 560, 'r', 'balance')]
     out['santander_dual'] = statement('santander_dual' + suf + '.pdf', 'Banco Ejemplo Rojo', [
