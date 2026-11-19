@@ -154,7 +154,7 @@
     const cols = [], others = [];
     for (const t of line.tokens) {
       const role = roleOf(t.s);
-      if (!role) { others.push({ x: t.x, r: t.r, c: (t.x + t.r) / 2 }); continue; }
+      if (!role) { others.push({ s: t.s, x: t.x, r: t.r, c: (t.x + t.r) / 2 }); continue; }
       const prev = cols.length ? cols[cols.length - 1] : null;
       if (prev && prev.role === role) { prev.r = t.r; continue; }         // "Saldo" "Saldos" side by side
       cols.push({ role, x: t.x, r: t.r, c: (t.x + t.r) / 2 });
@@ -200,6 +200,16 @@
     return null;
   }
 
+  const CURRENCY_CODE = /^(ARS|BRL|USD|EUR|UYU|CLP|MXN|PYG|COP|PEN|BOB|GBP|CAD|AUD|JPY|CNY|CHF)$/;
+  const hasLocal = cols => !!(cols && cols.others && cols.others.some(o => /^(equivalente|local)$/i.test(o.s)));
+  // a token that belongs to the local-currency columns: its code or its amount, right of the money column
+  function takeLocal(cols, row, t) {
+    if (!hasLocal(cols)) return false;
+    if (CURRENCY_CODE.test(t.s) && !row.localCur) { row.localCur = t.s; return true; }
+    const right = Math.max(...cols.filter(c => MONEY.has(c.role)).map(c => c.r));
+    if (isAmount(t.s) && row.local == null && t.x > right) { row.local = parseAmount(t.s); return true; }
+    return false;
+  }
   const CUOTA_RE = /^(?:c\.?|cuota)?\s?(\d{1,2})\/(\d{1,2})$/i;
 
   // ---- issuer --------------------------------------------------------------------------------
@@ -289,6 +299,7 @@
             const mid = (t.x + t.r) / 2;
             const refCol = cols.filter(c => c.role === 'ref').sort((p, q) => Math.abs(p.c - mid) - Math.abs(q.c - mid))[0];
             if (refCol && /^[\dA-Z\-]{3,}$/.test(t.s) && /\d{5,}/.test(t.s) && Math.abs(mid - refCol.c) < 40 && !row.ref) { row.ref = t.s; continue; }
+            if (takeLocal(cols, row, t)) continue;
             text.push(t.s);
           }
           row.desc = text.join(' ');
@@ -318,6 +329,7 @@
             if (c) { if (row[c.role] == null) row[c.role] = parseAmount(t.s); continue; }
             const mid = (t.x + t.r) / 2, refCol = cols.find(k => k.role === 'ref' && Math.abs(mid - k.c) < 40);
             if (refCol && !row.ref && /^\d{3,}$/.test(t.s)) { row.ref = t.s; continue; }
+            if (takeLocal(cols, row, t)) continue;
             text.push(t.s);
           }
           row.desc = text.join(' ');

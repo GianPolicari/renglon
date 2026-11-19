@@ -174,12 +174,62 @@
   $('#onlyFlag').addEventListener('change', renderRows);
 
   // ---- exports ----
+  // the movements table; money: indexes of the columns that get a total
   function sheet() {
     const M = v => v == null ? '' : { money: v }, D = iso => iso ? { date: iso } : '';
-    if (result.kind === 'cuenta') return { head: ['Fecha', 'Descripción', 'Referencia', 'Débito', 'Crédito', 'Importe', 'Saldo', 'Página', 'Revisar'], widths: [12, 48, 14, 14, 14, 14, 16, 8, 30],
-      rows: result.rows.map(r => [D(r.date), r.desc, r.ref, M(r.debit), M(r.credit), M(r.amount), M(r.balance), r.page, r.flags.join('; ')]) };
-    return { head: ['Fecha', 'Descripción', 'Tipo', 'Comprobante', 'Cuota', 'Pesos', 'Dólares', 'Página', 'Revisar'], widths: [12, 44, 18, 13, 8, 16, 14, 8, 30],
+    if (result.kind === 'cuenta') {
+      const local = result.rows.some(r => r.local != null);
+      return { head: ['Fecha', 'Descripción', 'Referencia', 'Débito', 'Crédito', 'Importe', 'Saldo', ...(local ? ['Moneda local', 'Monto local'] : []), 'Página', 'Revisar'],
+        widths: [12, 46, 14, 15, 15, 15, 16, ...(local ? [9, 15] : []), 8, 34], money: [3, 4, 5], right: [3, 4, 5, 6, ...(local ? [8] : [])],
+        rows: result.rows.map(r => [D(r.date), r.desc, r.ref, M(r.debit), M(r.credit), M(r.amount), M(r.balance), ...(local ? [r.localCur || '', M(r.local)] : []), r.page, r.flags.join('; ')]) };
+    }
+    return { head: ['Fecha', 'Descripción', 'Tipo', 'Comprobante', 'Cuota', 'Pesos', 'Dólares', 'Página', 'Revisar'], widths: [12, 44, 18, 13, 8, 16, 14, 8, 34], money: [5, 6], right: [5, 6],
       rows: result.rows.map(r => [D(r.date), r.desc, TYPE[r.type] || '', r.ref, r.cuota, M(r.ars), M(r.usd), r.page, r.flags.join('; ')]) };
+  }
+  const BANKS = { galicia: 'Banco Galicia', santander: 'Santander', nacion: 'Banco Nación', provincia: 'Banco Provincia', bbva: 'BBVA', macro: 'Banco Macro',
+    ciudad: 'Banco Ciudad', icbc: 'ICBC', supervielle: 'Supervielle', patagonia: 'Banco Patagonia', credicoop: 'Credicoop', hipotecario: 'Banco Hipotecario',
+    comafi: 'Banco Comafi', columbia: 'Banco Columbia', brubank: 'Brubank', uala: 'Ualá', mercadopago: 'Mercado Pago', naranjax: 'Naranja X', arq: 'ARQ',
+    amex: 'American Express', cabal: 'Cabal', mastercard: 'Mastercard', visa: 'Visa', sample: 'ejemplo inventado' };
+  // Excel: a "Resumen" sheet with the balance check, then the movements with totals, filters and the rows to review highlighted
+  function workbook() {
+    const s = sheet(), n = s.rows.length, c = result.check, card = result.kind === 'tarjeta';
+    const M = v => v == null ? '' : { money: v }, letter = i => window.TaxDropXlsx.colName(i);
+    const flagCol = s.head.length - 1;
+    const mov = [s.head, ...s.rows.map(r => r.map((v, i) => i === flagCol && v ? { v, s: 'flag' } : v))];
+    const total = s.head.map((_, i) => i === 1 ? { v: 'Total', s: 'totalLabel' } : s.money.includes(i) ? { f: `SUBTOTAL(9,${letter(i)}2:${letter(i)}${n + 1})`, s: 'totalMoney' } : { v: '', s: 'totalLabel' });
+    mov.push(total);
+    const dates = result.rows.map(r => r.date).filter(Boolean).sort();
+    const bank = BANKS[result.issuer] || '';
+    const title = (card ? 'Resumen de tarjeta' : 'Resumen de cuenta') + (bank ? ' · ' + bank : '');
+    const period = dates.length ? `Movimientos del ${dmy(dates[0])} al ${dmy(dates[dates.length - 1])}` : '';
+    const today = new Date().toISOString().slice(0, 10);
+    const flagged = result.rows.filter(r => r.flags.length).length;
+    const verdict = st => st === 'ok' ? { v: 'Cierra: la suma de los movimientos da el saldo del resumen', s: 'ok' }
+      : st === 'mismatch' ? { v: 'No cierra: revisá las filas marcadas en la hoja Movimientos', s: 'bad' }
+      : { v: 'Sin saldo final en el resumen para controlar', s: 'warn' };
+    const R = [
+      [{ v: title, s: 'title' }], [{ v: [period, `${n} movimientos`, `convertido el ${dmy(today)} con renglon.com.ar`].filter(Boolean).join(', '), s: 'sub' }], [],
+      [{ v: 'Control de saldos', s: 'section' }, { v: '', s: 'section' }, { v: '', s: 'section' }]];
+    if (!card) {
+      R.push([{ v: 'Saldo anterior', s: 'label' }, { v: M(c.opening), s: 'moneyBold' }],
+        [{ v: 'Créditos', s: 'label' }, { v: M(result.rows.reduce((a, r) => a + (r.credit || 0), 0)), s: 'moneyBold' }],
+        [{ v: 'Débitos', s: 'label' }, { v: M(-result.rows.reduce((a, r) => a + Math.abs(r.debit || 0), 0)), s: 'moneyBold' }],
+        [{ v: '= Saldo calculado', s: 'totalLabel' }, { v: M(c.expected), s: 'totalMoney' }],
+        [{ v: 'Saldo según el resumen', s: 'label' }, { v: M(c.closing), s: 'moneyBold' }], [], [verdict(c.state)]);
+    } else {
+      R.push([{ v: '', s: 'label' }, { v: 'Pesos', s: 'label' }, { v: 'Dólares', s: 'label' }]);
+      const both = (label, k, sign, st) => [{ v: label, s: st || 'label' }, ...['ars', 'usd'].map(cur => ({ v: M(c[cur] && c[cur][k] != null ? (sign < 0 ? -Math.abs(c[cur][k]) : c[cur][k]) : null), s: st ? 'totalMoney' : 'moneyBold' }))];
+      R.push(both('Saldo anterior', 'opening', 1), both('Consumos', 'consumos', 1), both('Impuestos, cargos e intereses', 'cargos', 1), both('Pagos y devoluciones', 'pagos', -1),
+        both('= Saldo calculado', 'expected', 1, 'totalLabel'), both('Total según el resumen', 'closing', 1), [], [verdict(c.state)]);
+    }
+    R.push([], [{ v: flagged ? `${flagged} movimiento${flagged > 1 ? 's' : ''} para revisar: están en amarillo en la hoja Movimientos.` : 'Ningún movimiento quedó marcado para revisar.', s: flagged ? 'warn' : 'plain' }]);
+    if (result.rows.some(r => r.local != null)) R.push([{ v: 'Las columnas "Moneda local" y "Monto local" muestran cuánto fue cada movimiento en la moneda en que se pagó.', s: 'plain' }]);
+    R.push([], [{ v: 'Renglón convierte datos y no es asesoramiento contable ni impositivo. Compará siempre con tu resumen. El PDF se leyó en tu navegador y no se subió a ningún servidor.', s: 'note' }]);
+    const last = R.length;
+    return window.TaxDropXlsx.buildBook([
+      { name: 'Resumen', rows: R, widths: [34, 20, 20, 12], grid: false, heights: { 1: 30, [last]: 30 }, merges: ['A1:D1', 'A2:D2', `A${last}:D${last}`] },
+      { name: 'Movimientos', rows: mov, widths: s.widths, freeze: 1, headRow: 1, rightCols: s.right, filter: `A1:${letter(s.head.length - 1)}${n + 1}`, heights: { 1: 22 } },
+    ]);
   }
   function download(name, blob) {
     const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = name;
@@ -187,8 +237,7 @@
   }
   $('#dlX').addEventListener('click', () => {
     if (!result) return;
-    const s = sheet();
-    const out = window.TaxDropXlsx.build([s.head, ...s.rows], 'Movimientos', { header: true, widths: s.widths });
+    const out = workbook();
     T('download', { fid, format: 'xlsx', broker: result.issuer, software: result.kind });
     download(`${baseName}.xlsx`, new Blob([out], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' }));
   });
