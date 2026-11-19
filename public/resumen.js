@@ -147,29 +147,81 @@
     if (/^(dolares|usd|us\$|u\$s|dolar)$/.test(n) || /^u\$s$|^us\$$/i.test(w)) return 'usd';
     return null;
   }
+  // a heading written on two lines, read as one phrase ("Caja de Ahorro / en pesos", "Cotización / del dólar")
+  function roleOfPhrase(w) {
+    const n = norm(w);
+    if (/^(cajadeahorros?|cuentacorriente)/.test(n)) return 'amount';
+    if (/^(cotizacion|tipodecambio|equivalente|pesosusados|montolocal)/.test(n)) return null;
+    if (/^(importe|monto|valor)/.test(n)) return /dolar|u\$s|usd/.test(n) ? 'usd' : 'amount';
+    if (/^saldo/.test(n)) return 'balance';
+    return roleOf(w);
+  }
+  // join the heading cells of the line above to the cells they sit on (a cell: words one space apart)
+  function cells(tokens) {
+    const out = [];
+    for (const t of tokens) {
+      const c = out[out.length - 1];
+      if (c && t.x - c.r < 6) { c.toks.push(t); c.r = t.r; } else out.push({ toks: [t], x: t.x, r: t.r });
+    }
+    return out;
+  }
+  function stack(cur, above) {
+    const groups = cells(cur).map(c => ({ low: [c], up: [] }));
+    for (const a of cells(above)) {
+      const hit = groups.filter(g => g.low.some(t => t.x < a.r + 1 && t.r > a.x - 1));
+      if (!hit.length) continue;
+      for (const g of hit.slice(1)) { hit[0].low.push(...g.low); hit[0].up.push(...g.up); groups.splice(groups.indexOf(g), 1); }
+      hit[0].up.push(a);
+    }
+    const byX = (p, q) => p.x - q.x, out = [];
+    for (const g of groups) {
+      if (!g.up.length) { for (const c of g.low) out.push(...c.toks); continue; }   // nothing above: the words as they were
+      const all = [...g.up.sort(byX), ...g.low.sort(byX)];
+      out.push({ s: all.map(c => c.toks.map(t => t.s).join(' ')).join(' '), x: Math.min(...all.map(c => c.x)), r: Math.max(...all.map(c => c.r)), multi: true });
+    }
+    return out;
+  }
   const MONEY = new Set(['debit', 'credit', 'balance', 'amount', 'ars', 'usd']);
-  // A heading line names a date column and at least one money column.
-  function readHeader(line) {
+  // A heading line names a date column and at least one money column. `above`: the line right above, for headings on two lines.
+  function readHeader(line, above) {
     if (line.tokens.some(t => isAmount(t.s))) return null;   // a heading has words, not amounts
+    const plain = headerFrom(line.tokens);
+    if (!above || Math.abs(above.y - line.y) > 14 || above.tokens.some(t => isAmount(t.s)) || readDate(above.tokens)) return plain;
+    const st = headerFrom(stack(line.tokens, above.tokens));
+    if (!st) return plain;
+    if (!plain) return st.some(c => c.role === 'date') ? st : null;
+    // the two-line reading wins when it keeps every non-money column and finds at least as many money columns
+    const non = cs => cs.filter(c => !MONEY.has(c.role)).map(c => c.role).sort().join();
+    const money = cs => cs.filter(c => MONEY.has(c.role)).length;
+    return st.joined && non(st) === non(plain) && money(st) >= money(plain) ? st : plain;
+  }
+  function headerFrom(tokens) {
     const cols = [], others = [];
-    for (const t of line.tokens) {
-      const role = roleOf(t.s);
-      if (!role) { others.push({ s: t.s, x: t.x, r: t.r, c: (t.x + t.r) / 2 }); continue; }
+    let joined = false, lastTok = null, lastCol = null;
+    for (const t of tokens) {
+      const role = t.multi ? roleOfPhrase(t.s) : roleOf(t.s);
+      if (t.multi) joined = true;
+      if (!role) {
+        // "Saldo en cuenta": words one space after a heading word belong to that heading
+        if (lastCol && !t.multi && t.x - lastTok.r < 6) { lastCol.r = t.r; lastCol.c = (lastCol.x + lastCol.r) / 2; lastTok = t; continue; }
+        others.push({ s: t.s, x: t.x, r: t.r, c: (t.x + t.r) / 2 }); lastCol = null; lastTok = t; continue;
+      }
       const prev = cols.length ? cols[cols.length - 1] : null;
-      if (prev && prev.role === role) { prev.r = t.r; continue; }         // "Saldo" "Saldos" side by side
-      cols.push({ role, x: t.x, r: t.r, c: (t.x + t.r) / 2 });
+      lastTok = t;
+      if (prev && prev.role === role && !t.multi && !prev.multi) { prev.r = t.r; prev.c = (prev.x + prev.r) / 2; lastCol = prev; continue; }         // "Saldo" "Saldos" side by side
+      cols.push({ role, x: t.x, r: t.r, c: (t.x + t.r) / 2, multi: !!t.multi }); lastCol = cols[cols.length - 1];
     }
     const roles = new Set(cols.map(c => c.role));
     const money = cols.filter(c => MONEY.has(c.role)).length;
     if (!money || cols.length < 2) return null;
     if (!roles.has('date') && money < 2) return null;      // "PESOS DÓLARES" alone is a heading too
-    cols.others = others;
+    cols.others = others; cols.joined = joined;
     // "Saldo en $" or "Débitos $" on a bank account: the "$" names the currency, not a pesos column
     if (roles.has('ars') && !roles.has('usd') && (roles.has('debit') || roles.has('credit') || roles.has('balance'))) return keep(cols.filter(c => c.role !== 'ars'));
     // "Importe" next to "Pesos"/"Dólares" headings is a group title, not a column of its own
     if (roles.has('ars') || roles.has('usd')) return keep(cols.filter(c => c.role !== 'amount'));
     return cols;
-    function keep(list) { list.others = others; return list; }
+    function keep(list) { list.others = others; list.joined = joined; return list; }
   }
   // Which money column an amount belongs to: amounts are right-aligned under their heading.
   function moneyColumn(cols, tok) {
@@ -181,13 +233,13 @@
       if (d < bd) { bd = d; best = c; }
     }
     // closer to a heading that is not a money column (e.g. "Equivalente"): it belongs there
-    if (best && cols.others && cols.others.some(o => Math.min(Math.abs(tok.r - o.r), Math.abs((tok.x + tok.r) / 2 - o.c)) < bd - 4 && o.x > best.r)) return null;
+    if (best && cols.others && cols.others.some(o => o.s.length > 3 && Math.min(Math.abs(tok.r - o.r), Math.abs((tok.x + tok.r) / 2 - o.c)) < bd - 4 && o.x > best.r)) return null;
     return best;
   }
 
   // ---- summary lines -------------------------------------------------------------------------
   const SUMMARY = [
-    ['opening', /balance (de inicio|inicial)|saldo (anterior|inicial|al inicio)|saldo del (resumen|periodo) anterior|saldo ultimo resumen/],
+    ['opening', /balance (de inicio|inicial)|saldo (anterior|inicial|al inicio)|saldo del (resumen|periodo) anterior|saldo ultimo (resumen|extracto)/],
     ['closing', /balance final|saldo (final|actual|al cierre|a la fecha|total)|saldo al\b|nuevo saldo|saldo del periodo|total a pagar|saldo de cierre/],
     ['total_debits', /total (de )?(debitos|debe|egresos)/],
     ['total_credits', /total (de )?(creditos|haber|ingresos)/],
@@ -201,7 +253,7 @@
   }
 
   const CURRENCY_CODE = /^(ARS|BRL|USD|EUR|UYU|CLP|MXN|PYG|COP|PEN|BOB|GBP|CAD|AUD|JPY|CNY|CHF)$/;
-  const hasLocal = cols => !!(cols && cols.others && cols.others.some(o => /^(equivalente|local)$/i.test(o.s)));
+  const hasLocal = cols => !!(cols && cols.others && cols.others.some(o => /^(equivalente|local)$|^pesos usados/i.test(o.s)));
   // a token that belongs to the local-currency columns: its code or its amount, right of the money column
   function takeLocal(cols, row, t) {
     if (!hasLocal(cols)) return false;
@@ -241,6 +293,19 @@
     let cols = null, last = null, latestIso = null, groupDate = null, refIso = null, lastSubtotalAt = -1, lastDated = null;
     const allText = [];
     const stats = { headers: 0, dateLines: 0, chars: 0, plain: 0 };   // only to say why nothing was read
+    // one statement can hold several accounts (pesos, dollars, checking): each gets its own section and its own check
+    const sections = [{ title: '', summary: {}, rows: 0 }];
+    let sec = sections[0], lastPlain = '', headTitle = '';
+    const near = (a, b) => a != null && b != null && Math.abs(a - b) < 0.011;
+    function running() {
+      let bal = sec.summary.opening != null ? sec.summary.opening : null;
+      for (const r of rows) {
+        if (r.acct !== sections.length - 1) continue;
+        if (r.balance != null) bal = r.balance;
+        else if (bal != null) bal = r2(bal + (r.amount != null ? r.amount : (r.credit || 0) - Math.abs(r.debit || 0)));
+      }
+      return bal;
+    }
 
     pages.forEach((items, pi) => {
       const lines = toLines(items);
@@ -249,12 +314,14 @@
       for (const ln of lines) { stats.chars += ln.text.length; stats.plain += (ln.text.match(/[A-Za-z0-9ÁÉÍÓÚÑáéíóúñ .,:\/$%()*\-]/g) || []).length; }
       for (let li = 0; li < lines.length; li++) {
         const ln = lines[li];
-        const h = readHeader(ln);
-        if (h) { cols = h; last = null; stats.headers++; setDescBounds(); continue; }
+        const h = readHeader(ln, lines[li - 1]);
+        if (h) { cols = h; last = null; stats.headers++; headTitle = lastPlain; setDescBounds(); continue; }
         if (!refIso) for (let k = 0; k < ln.tokens.length; k++) { const dd = readDate(ln.tokens.slice(k)); if (dd && dd.iso) { refIso = dd.iso; break; } }
         if (!cols) {
           const sk = summaryKind(ln.text), am = ln.tokens.filter(t => isAmount(t.s));
           if ((sk === 'opening' || sk === 'closing') && am.length === 1 && summary.ars[sk] == null) summary.ars[sk] = parseAmount(am[0].s);
+          if ((sk === 'opening' || sk === 'closing') && am.length === 1 && sec.summary[sk] == null) sec.summary[sk] = parseAmount(am[0].s);
+          if (!sk && ln.text.length < 120) lastPlain = ln.text;
           continue;
         }
         let toks = ln.tokens;
@@ -277,6 +344,22 @@
             // several cardholders: one "Total consumos" each, and they add up
             if (kind === 'subtotal') summary[cur].subtotal = r2((summary[cur].subtotal || 0) + parseAmount(t.s));
             else if (summary[cur][kind] == null) summary[cur][kind] = parseAmount(t.s);
+            // bank accounts: the balance column of opening and closing lines
+            if (!c || (c.role !== 'balance' && !(kind === 'total_debits' || kind === 'total_credits'))) continue;
+            const v = parseAmount(t.s);
+            if (kind === 'opening') {
+              // an opening balance that does not follow from what came before starts another account
+              const fresh = sec.summary.opening == null && !sec.rows && sec.summary.closing == null;
+              if (!fresh && (sec.rows ? !near(v, running()) : (sec.summary.closing != null || !near(v, sec.summary.opening)))) {
+                sec = { title: headTitle, summary: {}, rows: 0 }; sections.push(sec);
+              }
+              if (sec.summary.opening == null) sec.summary.opening = v;
+              if (!sec.title) sec.title = headTitle;
+            } else if (kind === 'closing') {
+              // the last closing line wins; one in the middle ("saldo final del día") is the balance after the movement above it
+              sec.summary.closing = v;
+              if (last && last.balance == null && last.acct === sections.length - 1) last.balance = v;
+            } else if (sec.summary[kind] == null) sec.summary[kind] = v;
           }
           if (kind === 'subtotal') lastSubtotalAt = rows.length;
           last = null;
@@ -319,6 +402,7 @@
           if (row.cuota) row.desc = row.desc.replace(/\s+(?:cta|cuota|cuotas)\.?$/i, '');
           const hasMoney = ['debit', 'credit', 'amount', 'ars', 'usd'].some(k => row[k] != null);
           if (!hasMoney && row.balance == null) { last = null; continue; }   // a date line with no amount: not a movement
+          row.acct = sections.length - 1; sec.rows++;
           rows.push(row); last = row; if (row.date) lastDated = row.date;
           continue;
         }
@@ -327,6 +411,7 @@
           last.desc = (last.desc + ' ' + ln.text).trim();
           continue;
         }
+        if (!amounts.length && ln.text.length < 120) lastPlain = ln.text;
         // the date printed on its own line, centred on a two-line movement (Santander and others)
         let nd = null;
         for (const j of [li + 1, li - 1]) { const o = lines[j]; if (o && Math.abs(o.y - ln.y) <= 10 && dateOnly(o)) { nd = dateOnly(o); break; } }
@@ -347,6 +432,7 @@
             text.push(t.s);
           }
           row.desc = text.join(' ');
+          row.acct = sections.length - 1; sec.rows++;
           rows.push(row); last = row;
         }
       }
@@ -392,7 +478,33 @@
         : lastSubtotalAt >= 0 ? (i < lastSubtotalAt ? 'consumo' : 'cargo')
         : (r.ref || r.cuota) ? 'consumo' : 'cargo';
     });
-    const check = kind === 'cuenta' ? checkAccount(rows, summary.ars) : checkCard(rows, summary);
+    // newest first (some banks print it that way): each account's movements go in date order, so balances can be followed
+    sections.forEach((x, idx) => {
+      const seg = rows.filter(r => r.acct === idx), d = seg.map(r => r.date).filter(Boolean);
+      if (d.length < 3 || d[0] <= d[d.length - 1] || d.some((v, i) => i && v > d[i - 1])) return;
+      rows.splice(rows.indexOf(seg[0]), seg.length, ...seg.reverse());
+      x.reversed = true;
+    });
+    if (sections.some(x => x.reversed)) warnings.push('El resumen lista los movimientos del más nuevo al más viejo: acá están ordenados por fecha.');
+    const used = sections.filter(x => x.rows);
+    let check;
+    if (kind !== 'cuenta') check = checkCard(rows, summary);
+    else if (used.length <= 1) {
+      const one = used[0] || sections[0];
+      check = checkAccount(rows, Object.assign({}, summary.ars, one.summary));
+    } else {
+      // several accounts: each one is checked against its own balances
+      const groups = used.map(x => rows.filter(r => r.acct === sections.indexOf(x)));
+      groups.forEach((g, i) => { for (const r of g) r.acct = i + 1; });
+      const parts = used.map((x, i) => {
+        const mine = groups[i];
+        const cur = /u\$s|us\$|usd|d[oó]lar/i.test(x.title) ? 'USD' : /\beur|euro/i.test(x.title) ? 'EUR' : 'ARS';
+        return Object.assign(checkAccount(mine, x.summary), { title: x.title.replace(/\s+/g, ' ').trim().slice(0, 60), currency: cur, count: mine.length });
+      });
+      check = { state: parts.every(x => x.state === 'ok') ? 'ok' : parts.some(x => x.state === 'mismatch') ? 'mismatch' : 'no-total',
+        breaks: parts.reduce((a, x) => a + x.breaks, 0), derivedOpening: parts.some(x => x.derivedOpening), accounts: parts };
+    }
+    if (!(check.accounts)) for (const r of rows) delete r.acct;
     if (!rows.length) warnings.push('No se encontraron movimientos. Puede que el formato de este resumen todavía no esté soportado.');
     // why nothing was read, as a code (never content): helps decide what to fix
     const diagnosis = rows.length ? null

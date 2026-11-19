@@ -85,7 +85,7 @@
       offerLayout();
       if (outcome === 'no_rows' && !isSample) $('#layoutCard').scrollIntoView({ behavior: 'smooth', block: 'center' });
       T('convert', { fid, outcome, error: outcome === 'ok' ? null : outcome === 'no_rows' ? (result.diagnosis || 'layout_not_recognized') : outcome, software: result.kind, broker: result.issuer,
-        pages: pages.length, rows: result.rows.length, sections: 1, sections_ok: st === 'ok' ? 1 : 0, flagged: result.rows.filter(r => r.flags.length).length, ms, size_kb: sizeKb });
+        pages: pages.length, rows: result.rows.length, sections: accts().length || 1, sections_ok: accts().length ? accts().filter(a => a.state === 'ok').length : (st === 'ok' ? 1 : 0), flagged: result.rows.filter(r => r.flags.length).length, ms, size_kb: sizeKb });
     } catch (e) {
       if (e instanceof Stop) return fail(e.outcome, e.message);
       console.error(e);
@@ -93,6 +93,10 @@
     }
   }
 
+  // several accounts in one statement (pesos, dollars, checking): each one has its own check
+  const accts = () => (result && result.check && result.check.accounts) || [];
+  const acctName = (a, i) => a.title || `Cuenta ${i + 1}${a.currency !== 'ARS' ? ' en ' + a.currency : ''}`;
+  const esc = x => String(x).replace(/[&<>"']/g, ch => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[ch]));
   const STATE = { ok: ['ok', 'Cierra'], mismatch: ['bad', 'No cierra'], 'no-total': ['warn', 'Sin saldo para controlar'] };
   // reconciliation: opening + additions - subtractions = calculated closing, against the statement's own figures.
   // lines: [op, label, value, statementFigure?] where a statement figure is shown as a "según el resumen" line.
@@ -104,7 +108,7 @@
       `<tr><td class="op">${op}</td><th scope="row">${label}</th><td class="n">${v(val)}</td></tr>` +
       (stmt != null ? `<tr class="stmt sub${differs(val, stmt) ? ' off' : ''}"><td class="op"></td><th scope="row">${stmtLabel}</th><td class="n">${v(stmt)}</td></tr>` : '')).join('');
     const el = document.createElement('div'); el.className = 'box ' + cls;
-    el.innerHTML = `<div class="h"><div class="t"><b>${title}</b><span>${sub}</span></div><span class="pill ${cls}">${c.state === 'ok' ? '✓ ' : ''}${txt}</span></div>
+    el.innerHTML = `<div class="h"><div class="t"><b>${esc(title)}</b><span>${esc(sub)}</span></div><span class="pill ${cls}">${c.state === 'ok' ? '✓ ' : ''}${txt}</span></div>
       <table class="rec"><tbody>
       <tr><td class="op"></td><th scope="row">Saldo anterior</th><td class="n">${v(c.opening)}</td></tr>
       ${body}
@@ -122,10 +126,12 @@
     $('#status').dataset.state = !n ? 'bad' : st === 'ok' ? 'ok' : 'warn';
     const sum = $('#sum'); sum.replaceChildren();
     if (res.kind === 'cuenta') {
-      const c = res.check;
-      const cred = r2(res.rows.reduce((a, r) => a + (r.credit || 0), 0)), deb = r2(res.rows.reduce((a, r) => a + (r.debit || 0), 0));
-      sum.appendChild(card('Cuenta', `${n} movimientos${c.breaks ? `, ${c.breaks} con el saldo cortado` : ''}`, c,
-        [['+', 'Créditos', cred, c.totalCredits ? c.totalCredits.statement : null, 'Total créditos según el resumen'], ['−', 'Débitos', deb, c.totalDebits ? c.totalDebits.statement : null, 'Total débitos según el resumen']]));
+      const parts = accts().length ? accts().map((c, i) => [acctName(c, i), c, res.rows.filter(r => r.acct === i + 1)]) : [['Cuenta', res.check, res.rows]];
+      for (const [name, c, rows] of parts) {
+        const cred = r2(rows.reduce((a, r) => a + (r.credit || 0), 0)), deb = r2(rows.reduce((a, r) => a + (r.debit || 0), 0));
+        sum.appendChild(card(name, `${rows.length} movimientos${c.currency && c.currency !== 'ARS' ? ' en ' + c.currency : ''}${c.breaks ? `, ${c.breaks} con el saldo cortado` : ''}`, c,
+          [['+', 'Créditos', cred, c.totalCredits ? c.totalCredits.statement : null, 'Total créditos según el resumen'], ['−', 'Débitos', deb, c.totalDebits ? c.totalDebits.statement : null, 'Total débitos según el resumen']]));
+      }
     } else {
       for (const [key, title, word] of [['ars', 'Pesos', 'en pesos'], ['usd', 'Dólares', 'en dólares']]) {
         const c = res.check[key]; if (!c) continue;
@@ -143,6 +149,7 @@
     const warns = res.warnings.slice();
     const flagged = res.rows.filter(r => r.flags.length).length;
     if (flagged) warns.push(`${flagged} movimiento${flagged === 1 ? '' : 's'} para revisar: están marcados en la tabla y en la columna "Revisar" del Excel.`);
+    if (accts().length) warns.push(`Este resumen tiene ${accts().length} cuentas: cada una se controla por separado y en el Excel están en la columna "Cuenta".`);
     if (res.kind === 'cuenta' && res.check.derivedOpening) warns.push('El resumen no muestra el saldo anterior: lo calculamos con el primer movimiento.');
     const w = $('#warns'); w.replaceChildren();
     warns.forEach(x => { const li = document.createElement('li'); li.textContent = x; w.appendChild(li); });
@@ -154,12 +161,12 @@
 
   const TYPE = { consumo: 'Consumo', cargo: 'Impuesto o cargo', pago: 'Pago o devolución' };
   const COLS = {
-    cuenta: [['Fecha', r => dmy(r.date)], ['Descripción', r => r.desc], ['Referencia', r => r.ref], ['Débito', r => fmt(r.debit), 1], ['Crédito', r => fmt(r.credit), 1], ['Saldo', r => fmt(r.balance), 1], ['Pág.', r => r.page], ['Revisar', r => r.flags.join('; ')]],
+    cuenta: [['Cuenta', r => r.acct ? acctName(accts()[r.acct - 1], r.acct - 1) : null], ['Fecha', r => dmy(r.date)], ['Descripción', r => r.desc], ['Referencia', r => r.ref], ['Débito', r => fmt(r.debit), 1], ['Crédito', r => fmt(r.credit), 1], ['Saldo', r => fmt(r.balance), 1], ['Pág.', r => r.page], ['Revisar', r => r.flags.join('; ')]],
     tarjeta: [['Fecha', r => dmy(r.date)], ['Descripción', r => r.desc], ['Tipo', r => TYPE[r.type] || ''], ['Comprobante', r => r.ref], ['Cuota', r => r.cuota], ['Pesos', r => fmt(r.ars), 1], ['Dólares', r => fmt(r.usd), 1], ['Pág.', r => r.page], ['Revisar', r => r.flags.join('; ')]],
   };
   function renderRows() {
     if (!result) return;
-    const cols = COLS[result.kind];
+    const cols = COLS[result.kind].filter(c => c[0] !== 'Cuenta' || accts().length);
     const th = $('#thead'); th.innerHTML = '<tr>' + cols.map(c => `<th${c[2] ? ' class="n"' : ''}>${c[0]}</th>`).join('') + '</tr>';
     const only = $('#onlyFlag').checked, tb = $('#tbody'); tb.replaceChildren();
     const frag = document.createDocumentFragment();
@@ -178,14 +185,15 @@
   function sheet() {
     const M = v => v == null ? '' : { money: v }, D = iso => iso ? { date: iso } : '';
     if (result.kind === 'cuenta') {
-      const local = result.rows.some(r => r.local != null);
+      const local = result.rows.some(r => r.local != null), many = accts().length > 0, k = many ? 1 : 0;
       // no running balance on the statement (wallets): compute it from the opening balance, and say so in the heading
-      const calc = !result.rows.some(r => r.balance != null) && result.check && result.check.opening != null;
+      const calc = !many && !result.rows.some(r => r.balance != null) && result.check && result.check.opening != null;
       let run = calc ? result.check.opening : 0;
       const bal = r => calc ? (run = Math.round((run + (r.amount || 0)) * 100) / 100) : r.balance;
-      return { head: ['Fecha', 'Descripción', 'Referencia', 'Débito', 'Crédito', 'Importe', calc ? 'Saldo (calculado)' : 'Saldo', ...(local ? ['Moneda local', 'Monto local'] : []), 'Página', 'Revisar'],
-        widths: [12, 46, 14, 15, 15, 15, 16, ...(local ? [9, 15] : []), 8, 34], money: [3, 4, 5], right: [3, 4, 5, 6, ...(local ? [8] : [])],
-        rows: result.rows.map(r => [D(r.date), r.desc, r.ref, M(r.debit), M(r.credit), M(r.amount), M(bal(r)), ...(local ? [r.localCur || '', M(r.local)] : []), r.page, r.flags.join('; ')]) };
+      const sh = n => n.map(i => i + k);
+      return { head: [...(many ? ['Cuenta'] : []), 'Fecha', 'Descripción', 'Referencia', 'Débito', 'Crédito', 'Importe', calc ? 'Saldo (calculado)' : 'Saldo', ...(local ? ['Moneda local', 'Monto local'] : []), 'Página', 'Revisar'],
+        widths: [...(many ? [30] : []), 12, 46, 14, 15, 15, 15, 16, ...(local ? [9, 15] : []), 8, 34], money: sh([3, 4, 5]), right: sh([3, 4, 5, 6, ...(local ? [8] : [])]), descCol: 1 + k,
+        rows: result.rows.map(r => [...(many ? [acctName(accts()[r.acct - 1], r.acct - 1)] : []), D(r.date), r.desc, r.ref, M(r.debit), M(r.credit), M(r.amount), M(bal(r)), ...(local ? [r.localCur || '', M(r.local)] : []), r.page, r.flags.join('; ')]) };
     }
     return { head: ['Fecha', 'Descripción', 'Tipo', 'Comprobante', 'Cuota', 'Pesos', 'Dólares', 'Página', 'Revisar'], widths: [12, 44, 18, 13, 8, 16, 14, 8, 34], money: [5, 6], right: [5, 6],
       rows: result.rows.map(r => [D(r.date), r.desc, TYPE[r.type] || '', r.ref, r.cuota, M(r.ars), M(r.usd), r.page, r.flags.join('; ')]) };
@@ -200,7 +208,7 @@
     const M = v => v == null ? '' : { money: v }, letter = i => window.TaxDropXlsx.colName(i);
     const flagCol = s.head.length - 1;
     const mov = [s.head, ...s.rows.map(r => r.map((v, i) => i === flagCol && v ? { v, s: 'flag' } : v))];
-    const total = s.head.map((_, i) => i === 1 ? { v: 'Total', s: 'totalLabel' } : s.money.includes(i) ? { f: `SUBTOTAL(9,${letter(i)}2:${letter(i)}${n + 1})`, s: 'totalMoney' } : { v: '', s: 'totalLabel' });
+    const total = s.head.map((_, i) => i === (s.descCol || 1) ? { v: 'Total', s: 'totalLabel' } : s.money.includes(i) ? { f: `SUBTOTAL(9,${letter(i)}2:${letter(i)}${n + 1})`, s: 'totalMoney' } : { v: '', s: 'totalLabel' });
     mov.push(total);
     const dates = result.rows.map(r => r.date).filter(Boolean).sort();
     const bank = BANKS[result.issuer] || '';
@@ -215,11 +223,16 @@
       [{ v: title, s: 'title' }], [{ v: [period, `${n} movimientos`, `convertido el ${dmy(today)} con renglon.com.ar`].filter(Boolean).join(', '), s: 'sub' }], [],
       [{ v: 'Control de saldos', s: 'section' }, { v: '', s: 'section' }, { v: '', s: 'section' }]];
     if (!card) {
-      R.push([{ v: 'Saldo anterior', s: 'label' }, { v: M(c.opening), s: 'moneyBold' }],
-        [{ v: 'Créditos', s: 'label' }, { v: M(result.rows.reduce((a, r) => a + (r.credit || 0), 0)), s: 'moneyBold' }],
-        [{ v: 'Débitos', s: 'label' }, { v: M(-result.rows.reduce((a, r) => a + Math.abs(r.debit || 0), 0)), s: 'moneyBold' }],
-        [{ v: '= Saldo calculado', s: 'totalLabel' }, { v: M(c.expected), s: 'totalMoney' }],
-        [{ v: 'Saldo según el resumen', s: 'label' }, { v: M(c.closing), s: 'moneyBold' }], [], [verdict(c.state)]);
+      const parts = accts().length ? accts().map((a, i) => [acctName(a, i) + (a.currency !== 'ARS' ? ` (${a.currency})` : ''), a, result.rows.filter(r => r.acct === i + 1)]) : [[null, c, result.rows]];
+      parts.forEach(([name, a, rows], i) => {
+        if (name) R.push(...(i ? [[]] : []), [{ v: name, s: 'label' }]);
+        R.push([{ v: 'Saldo anterior', s: 'label' }, { v: M(a.opening), s: 'moneyBold' }],
+          [{ v: 'Créditos', s: 'label' }, { v: M(rows.reduce((x, r) => x + (r.credit || 0), 0)), s: 'moneyBold' }],
+          [{ v: 'Débitos', s: 'label' }, { v: M(-rows.reduce((x, r) => x + Math.abs(r.debit || 0), 0)), s: 'moneyBold' }],
+          [{ v: '= Saldo calculado', s: 'totalLabel' }, { v: M(a.expected), s: 'totalMoney' }],
+          [{ v: 'Saldo según el resumen', s: 'label' }, { v: M(a.closing), s: 'moneyBold' }], [verdict(a.state)]);
+      });
+      if (parts.length > 1) R.push([], [{ v: 'Cada cuenta se controla con sus propios saldos. En la hoja Movimientos, filtrá la columna "Cuenta" para ver los totales de una sola.', s: 'plain' }]);
     } else {
       R.push([{ v: '', s: 'label' }, { v: 'Pesos', s: 'label' }, { v: 'Dólares', s: 'label' }]);
       const both = (label, k, sign, st) => [{ v: label, s: st || 'label' }, ...['ars', 'usd'].map(cur => ({ v: M(c[cur] && c[cur][k] != null ? (sign < 0 ? -Math.abs(c[cur][k]) : c[cur][k]) : null), s: st ? 'totalMoney' : 'moneyBold' }))];

@@ -206,5 +206,155 @@
    "closing": 734013.93
   },
   "usd": null
+ },
+ "galicia_plus": {
+  "rows": 26,
+  "opening": 210000.0,
+  "closing": -68191.55
+ },
+ "hsbc": {
+  "rows": 26,
+  "opening": 5000.0,
+  "closing": -633208.68
+ },
+ "bbva_multi": {
+  "rows": 24,
+  "sections": [
+   {
+    "opening": 320000.0,
+    "closing": 220341.89,
+    "rows": 18
+   },
+   {
+    "opening": 1500.0,
+    "closing": 627.74,
+    "rows": 6
+   }
+  ]
+ },
+ "macro_multi": {
+  "rows": 25,
+  "sections": [
+   {
+    "opening": 98000.0,
+    "closing": -282127.68,
+    "rows": 20
+   },
+   {
+    "opening": 820.0,
+    "closing": 378.67,
+    "rows": 5
+   }
+  ]
+ },
+ "comafi_multi": {
+  "rows": 41,
+  "sections": [
+   {
+    "opening": 450000.0,
+    "closing": -73280.14,
+    "rows": 34
+   },
+   {
+    "opening": 12000.0,
+    "closing": 6406.47,
+    "rows": 7
+   }
+  ]
+ },
+ "hipotecario_cc": {
+  "rows": 24,
+  "opening": 75000.0,
+  "closing": -520277.85
+ },
+ "hipotecario_dia": {
+  "rows": 22,
+  "opening": 60000.0,
+  "closing": -236314.31
+ },
+ "santander_paquete": {
+  "rows": 20,
+  "opening": 44000.0,
+  "closing": 64472.98
+ },
+ "mercadopago_usd": {
+  "rows": 16,
+  "opening": 300.0,
+  "closing": 4.51
+ },
+ "galicia_plus_chars": {
+  "rows": 26,
+  "opening": 210000.0,
+  "closing": -68191.55
+ },
+ "hsbc_chars": {
+  "rows": 26,
+  "opening": 5000.0,
+  "closing": -633208.68
+ },
+ "bbva_multi_chars": {
+  "rows": 24,
+  "sections": [
+   {
+    "opening": 320000.0,
+    "closing": 220341.89,
+    "rows": 18
+   },
+   {
+    "opening": 1500.0,
+    "closing": 627.74,
+    "rows": 6
+   }
+  ]
+ },
+ "macro_multi_chars": {
+  "rows": 25,
+  "sections": [
+   {
+    "opening": 98000.0,
+    "closing": -282127.68,
+    "rows": 20
+   },
+   {
+    "opening": 820.0,
+    "closing": 378.67,
+    "rows": 5
+   }
+  ]
+ },
+ "comafi_multi_chars": {
+  "rows": 41,
+  "sections": [
+   {
+    "opening": 450000.0,
+    "closing": -73280.14,
+    "rows": 34
+   },
+   {
+    "opening": 12000.0,
+    "closing": 6406.47,
+    "rows": 7
+   }
+  ]
+ },
+ "hipotecario_cc_chars": {
+  "rows": 24,
+  "opening": 75000.0,
+  "closing": -520277.85
+ },
+ "hipotecario_dia_chars": {
+  "rows": 22,
+  "opening": 60000.0,
+  "closing": -236314.31
+ },
+ "santander_paquete_chars": {
+  "rows": 20,
+  "opening": 44000.0,
+  "closing": 64472.98
+ },
+ "mercadopago_usd_chars": {
+  "rows": 16,
+  "opening": 300.0,
+  "closing": 4.51
  }
 }
