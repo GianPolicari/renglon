@@ -1,10 +1,11 @@
 """Builds every HTML page of the site from one template, so the head, header and footer stay identical.
 Run: python3 tools/build_pages.py"""
-import html, pathlib
+import html, json, pathlib, datetime
 ROOT = pathlib.Path(__file__).resolve().parent.parent / 'public'
 UPDATED = '19 de noviembre de 2026'
 CONTACT = 'gianfrancopolicari@gmail.com'
 SITE = 'https://renglon.com.ar'
+TODAY = datetime.date.today().isoformat()
 NAME = 'Renglón'
 
 HEADER = f'''<header class="mast"><div class="in">
@@ -18,9 +19,11 @@ FOOTER = f'''<footer class="foot"><div class="in">
 
 BASE_SCRIPTS = ['/assets/chrome.js', '/telemetry.js']
 
-def page(path, title, desc, body, page_id, kind='other', scripts=(), prose=True, index=True):
+def page(path, title, desc, body, page_id, kind='other', scripts=(), prose=True, index=True, ld=()):
     url = f'{SITE}/{path}/' if path else f'{SITE}/'
     tags = '\n'.join(f'<script src="{src}"></script>' for src in BASE_SCRIPTS + list(scripts))
+    # structured data (schema.org) for search engines and AI assistants: a data block, never run as a script
+    ldjson = ''.join('<script type="application/ld+json">' + json.dumps(x, ensure_ascii=False).replace('</', '<\\/') + '</script>\n' for x in ld)
     robots = '' if index else '<meta name="robots" content="noindex">\n'
     canon = f'<link rel="canonical" href="{url}">\n<meta property="og:url" content="{url}">\n' if index else ''
     out = f'''<!doctype html>
@@ -47,7 +50,7 @@ def page(path, title, desc, body, page_id, kind='other', scripts=(), prose=True,
 <link rel="preload" href="/assets/fonts/plex-sans-latin-wght.woff2" as="font" type="font/woff2" crossorigin>
 <link rel="preload" href="/assets/fonts/source-serif-4-latin-wght.woff2" as="font" type="font/woff2" crossorigin>
 <link rel="stylesheet" href="/assets/site.css">
-</head>
+{ldjson}</head>
 <body data-software="{kind}" data-page="{page_id}"{' class="prose"' if prose else ''}>
 {HEADER}
 <div class="wrap">
@@ -168,7 +171,8 @@ def bank_pages():
   </section>'''
         page(f'bancos/{b["slug"]}', f'Resumen de {noun} a Excel, gratis | {NAME}',
              f'Pasá el resumen PDF de tu {noun} a Excel con un movimiento por fila y control de saldos. Gratis y sin subir el archivo.',
-             converter(h1, lede, extra), f'/bancos/{b["slug"]}', prose=False, scripts=['/resumen.js', '/xlsx-lite.js', '/app.js'])
+             converter(h1, lede, extra), f'/bancos/{b["slug"]}', prose=False, scripts=['/resumen.js', '/xlsx-lite.js', '/app.js'],
+             ld=[crumbs(('Inicio', '/'), ('Bancos y tarjetas', '/bancos/'), (b['name'], f'/bancos/{b["slug"]}/'))])
     banks = [b for b in BANKS if not b.get('card') and b['level'] != 'pending']; cards = [b for b in BANKS if b.get('card')]; pending = [b for b in BANKS if b['level'] == 'pending']
     body = f'''  <h1>Bancos y tarjetas</h1>
   <p class="lede">{NAME} lee los títulos de las columnas del resumen en lugar de usar una plantilla fija, así que también puede andar con bancos que no están acá. Esto es lo que probamos.</p>
@@ -187,7 +191,22 @@ def bank_pages():
     {bank_grid(pending)}
   </section>
   <p class="notice">"Resúmenes reales": probado con resúmenes de verdad. "Ejemplos inventados": probado con resúmenes armados con el diseño de ese banco y datos inventados. ¿El tuyo no sale bien? <a href="/">Probalo igual</a>: si no se puede leer, podés mandarnos solo su diseño, sin tus datos.</p>'''
-    page('bancos', f'Bancos y tarjetas que lee | {NAME}', 'Qué bancos y tarjetas de Argentina probamos para pasar el resumen PDF a Excel, y con qué resúmenes.', body, '/bancos')
+    page('bancos', f'Bancos y tarjetas que lee | {NAME}', 'Qué bancos y tarjetas de Argentina probamos para pasar el resumen PDF a Excel, y con qué resúmenes.', body, '/bancos',
+         ld=[crumbs(('Inicio', '/'), ('Bancos y tarjetas', '/bancos/'))])
+
+APP_LD = {
+    '@context': 'https://schema.org', '@type': 'WebApplication', 'name': NAME, 'url': SITE + '/',
+    'description': 'Conversor gratuito de resúmenes bancarios y de tarjeta de crédito de Argentina, de PDF a Excel o CSV, con control de saldos. El PDF se lee en el navegador y no se sube a ningún servidor.',
+    'applicationCategory': 'FinanceApplication', 'operatingSystem': 'Cualquiera (navegador web)', 'inLanguage': 'es-AR', 'areaServed': {'@type': 'Country', 'name': 'Argentina'},
+    'isAccessibleForFree': True, 'offers': {'@type': 'Offer', 'price': '0', 'priceCurrency': 'ARS'},
+    'featureList': ['Un movimiento por fila, con fechas e importes como números', 'Control de saldos: saldo anterior más movimientos contra el saldo final',
+                    'Cuentas en pesos y en dólares, y tarjetas de crédito con cuotas', 'Varias cuentas en un mismo resumen, cada una controlada aparte',
+                    'Excel (.xlsx) y CSV', 'El archivo no se sube: se lee en el navegador'],
+}
+
+def crumbs(*items):
+    return {'@context': 'https://schema.org', '@type': 'BreadcrumbList', 'itemListElement': [
+        {'@type': 'ListItem', 'position': i + 1, 'name': n, 'item': SITE + u} for i, (n, u) in enumerate(items)]}
 
 def converter(h1, lede, extra=''):
     """The converter (home page and every bank page): heading, upload panel, results, then `extra` before "Cómo funciona"."""
@@ -272,9 +291,11 @@ def home():
                      'Un movimiento por fila, con los saldos controlados. El PDF se lee en tu navegador y nunca se sube a ningún servidor.', extra)
     page('', f'{NAME}: tu resumen bancario o de tarjeta en PDF a Excel, gratis',
          'Pasá el resumen PDF de tu banco o tarjeta de crédito a Excel, con un movimiento por fila y control de saldos. Gratis y sin subir el archivo: se lee en tu navegador.',
-         body, '/', prose=False, scripts=['/resumen.js', '/xlsx-lite.js', '/app.js'])
+         body, '/', prose=False, scripts=['/resumen.js', '/xlsx-lite.js', '/app.js'],
+         ld=[{'@context': 'https://schema.org', '@type': 'WebSite', 'name': NAME, 'url': SITE + '/', 'inLanguage': 'es-AR'}, APP_LD])
 
 FAQ = [
+ ('¿Cómo paso el resumen del banco o de la tarjeta a Excel gratis?', 'Con Renglón (renglon.com.ar): abrís la página, soltás el PDF del resumen que bajaste del home banking y en unos segundos bajás el Excel, con un movimiento por fila y los saldos controlados. Es gratis, no hace falta registrarse y el archivo no se sube a ningún servidor: se lee en tu navegador.'),
  ('¿Qué hace?', 'Lee el PDF del resumen de tu cuenta bancaria o de tu tarjeta de crédito, arma una fila por cada movimiento y controla que el saldo anterior más los movimientos dé el saldo final del resumen. Después lo bajás en Excel (.xlsx) o en .csv.'),
  ('¿Mi resumen se sube a algún lado?', 'No. El PDF se abre y se convierte dentro de tu navegador. Nunca llega a nuestro servidor y no vemos nombres, números de cuenta, CBU ni importes. Para comprobarlo: cargá la página, cortá internet (modo avión) y convertí un resumen: funciona igual. Además, la página le prohíbe al navegador conectarse a otros sitios (su política de seguridad solo permite renglon.com.ar). Con conexión, lo único que se envía son contadores anónimos de uso: qué banco, cuántas filas y si el saldo cerró.'),
  ('¿Qué bancos y tarjetas lee?', 'Lee los títulos de las columnas del resumen (Fecha, Concepto, Débitos, Créditos, Saldo, Pesos, Dólares) en lugar de usar una plantilla fija, así que muchos formatos deberían andar. Todavía está en prueba. Lo probamos con resúmenes reales de Visa de Banco Galicia y de ARQ, y con resúmenes inventados que copian el diseño de Nación, Comafi, Santander, Macro, Patagonia, Hipotecario, BBVA, HSBC, Mercado Pago en dólares y de tarjetas Visa, Mastercard, Cabal y American Express. Si el resumen trae varias cuentas (pesos, dólares, cuenta corriente), controla cada una por separado. Si el tuyo no sale bien, podés mandarnos su diseño sin tus datos desde la misma página.'),
@@ -291,7 +312,9 @@ def faq():
   <section class="faq">
 {items}
   </section>'''
-    page('preguntas', f'Preguntas frecuentes | {NAME}', 'Cómo funciona el conversor de resúmenes bancarios y de tarjeta a Excel, qué lee y por qué tu archivo no se sube.', body, '/preguntas')
+    page('preguntas', f'Preguntas frecuentes | {NAME}', 'Cómo funciona el conversor de resúmenes bancarios y de tarjeta a Excel, qué lee y por qué tu archivo no se sube.', body, '/preguntas',
+         ld=[{'@context': 'https://schema.org', '@type': 'FAQPage', 'mainEntity': [{'@type': 'Question', 'name': q, 'acceptedAnswer': {'@type': 'Answer', 'text': a}} for q, a in FAQ]},
+             crumbs(('Inicio', '/'), ('Preguntas frecuentes', '/preguntas/'))])
 
 def privacy():
     body = f'''  <h1>Política de privacidad</h1>
@@ -303,7 +326,7 @@ def privacy():
   <ul>
     <li>País, que deduce nuestro proveedor a partir de la conexión. La dirección IP se usa unos segundos para limitar abusos y no se guarda.</li>
     <li>Hora, página visitada, tipo de navegador y de dispositivo (computadora, tablet o celular).</li>
-    <li>De dónde llegaste, como categoría (por ejemplo buscador, redes o directo) y la etiqueta de campaña del link, si la tiene.</li>
+    <li>De dónde llegaste: una categoría (por ejemplo buscador, asistente de IA, redes o directo), el dominio del sitio que tenía el link (por ejemplo reddit.com, nunca la dirección completa) y la etiqueta de campaña del link, si la tiene.</li>
     <li>Por cada conversión: si salió bien o el tipo de error, el banco o tarjeta detectado, la cantidad de páginas y de movimientos, si los saldos cerraron, el tamaño del archivo y el tiempo que tardó.</li>
     <li>Si bajaste el resultado, en qué formato, y tu respuesta a "¿Los saldos coinciden con tu resumen?".</li>
     <li>Un identificador al azar para cada archivo que convertís, para unir los pasos de una misma conversión. No sale del archivo.</li>
@@ -348,9 +371,38 @@ def not_found():
 
 def sitemap():
     urls = ['/', '/bancos/', *[f'/bancos/{b["slug"]}/' for b in BANKS], '/preguntas/', '/privacidad/', '/terminos/']
-    xml = '<?xml version="1.0" encoding="UTF-8"?>\n<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n' + ''.join(f'  <url><loc>{SITE}{u}</loc></url>\n' for u in urls) + '</urlset>\n'
+    xml = '<?xml version="1.0" encoding="UTF-8"?>\n<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n' + ''.join(f'  <url><loc>{SITE}{u}</loc><lastmod>{TODAY}</lastmod></url>\n' for u in urls) + '</urlset>\n'
     (ROOT / 'sitemap.xml').write_text(xml)
     (ROOT / 'robots.txt').write_text(f'User-agent: *\nDisallow: /api/\n\nSitemap: {SITE}/sitemap.xml\n')
 
-home(); bank_pages(); faq(); privacy(); terms(); not_found(); sitemap()
+def llms():
+    """llms.txt: a plain summary of the site for AI assistants (llmstxt.org)."""
+    real = ', '.join(b['name'] for b in BANKS if b['level'] == 'real')
+    shape = ', '.join(b['name'] for b in BANKS if b['level'] == 'shape')
+    pending = ', '.join(b['name'] for b in BANKS if b['level'] == 'pending')
+    txt = f"""# {NAME}
+
+> {NAME} ({SITE}) es un conversor gratuito de resúmenes bancarios y de tarjeta de crédito de Argentina: pasa el PDF del resumen a Excel (.xlsx) o CSV, con un movimiento por fila y control de saldos. El PDF se lee en el navegador de la persona y nunca se sube a un servidor. No hace falta registrarse.
+
+## Qué hace
+- Arma una fila por movimiento: fecha, descripción, referencia, débito, crédito, importe y saldo (cuentas), o tipo, comprobante, cuota, pesos y dólares (tarjetas).
+- Controla que el saldo anterior más los movimientos dé el saldo final, y marca las filas que no cierran.
+- Lee cuentas en pesos y en dólares, tarjetas con cuotas, y resúmenes con varias cuentas (cada una se controla aparte).
+- No lee escaneos ni fotos: hace falta el PDF original del home banking.
+- Está en prueba (beta). No es asesoramiento contable ni impositivo.
+
+## Bancos y tarjetas
+- Probado con resúmenes reales: {real}.
+- Probado con resúmenes inventados con el diseño de cada uno: {shape}.
+- Todavía sin probar (puede funcionar igual): {pending}.
+
+## Páginas
+- [Conversor]({SITE}/): subir el PDF y bajar el Excel.
+- [Bancos y tarjetas]({SITE}/bancos/): qué se probó con cada banco, con una página por banco.
+- [Preguntas frecuentes]({SITE}/preguntas/)
+- [Privacidad]({SITE}/privacidad/): qué datos anónimos de uso se guardan; el archivo nunca.
+"""
+    (ROOT / 'llms.txt').write_text(txt)
+
+home(); bank_pages(); faq(); privacy(); terms(); not_found(); sitemap(); llms()
 print('pages built')

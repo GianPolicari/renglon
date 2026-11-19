@@ -36,6 +36,53 @@
       <div class="funnel" id="funnel"></div>
     </section>
 
+    <section class="card" id="vis">
+      <div class="row rowshead"><h2>Visibility: search engines, AI and mentions</h2><span class="tag">Checked every day at 08:17 · <button class="linkbtn" id="scanNow">Check now</button></span></div>
+      <div class="kpis" id="visKpis"></div>
+      <div class="cols">
+        <div><h3>Visits from AI and search (30 days)</h3><ul class="list" id="visRefs"></ul><p class="tag" id="visUtm"></p></div>
+        <div><h3>Sites that sent visits (30 days)</h3><ul class="list" id="visHosts"></ul></div>
+      </div>
+      <h3>Crawlers that read the site</h3>
+      <p class="tag">Search engines and AI that fetched the home page or robots.txt, by the name they give. Cloudflare's <a href="https://dash.cloudflare.com/795da29ebd09025a5316326b835b4d9d/renglon.com.ar/ai/security" target="_blank" rel="noopener">AI Crawl Control</a> has verified numbers for every page.</p>
+      <div class="tablewrap"><table>
+        <thead><tr><th>Crawler</th><th>What for</th><th class="n">Last 7 days</th><th class="n">Total</th><th>First seen</th><th>Last seen</th></tr></thead>
+        <tbody id="visCrawl"></tbody>
+      </table></div>
+      <h3>Mentions on the internet</h3>
+      <p class="tag" id="visScan"></p>
+      <div class="tablewrap"><table>
+        <thead><tr><th>Found</th><th>Where</th><th>Page</th></tr></thead>
+        <tbody id="visMentions"></tbody>
+      </table></div>
+      <details class="visbox">
+        <summary>Add Google Alerts (covers news, blogs and forums)</summary>
+        <ol class="tag">
+          <li>Open <a href="https://www.google.com/alerts" target="_blank" rel="noopener">google.com/alerts</a> with your Google account and type <code>renglon.com.ar</code>.</li>
+          <li>Show options → Deliver to: <b>RSS feed</b> → Create alert. Repeat with <code>"Renglón" resumen excel</code> if you want.</li>
+          <li>Copy the RSS icon's link (it starts with https://www.google.com/alerts/feeds/) and paste it here.</li>
+        </ol>
+        <form id="alertsForm" class="row"><label for="alertsUrl" class="sr">Google Alerts feed</label><input id="alertsUrl" type="url" placeholder="https://www.google.com/alerts/feeds/…" pattern="https://www\.google\.com/alerts/feeds/\d+/\d+"><button type="submit">Save</button></form>
+        <p class="tag" id="alertsMsg" role="status"></p>
+      </details>
+      <h3>Ask the AIs</h3>
+      <p class="tag">Opens each assistant with the question already typed. Look for Renglón in the answer and note what you saw: it builds a history of when each one starts naming the site.</p>
+      <div class="row"><label for="aiQ" class="sr">Question</label><select id="aiQ">
+        <option value="¿Qué herramienta gratis me pasa el resumen del banco o de la tarjeta de crédito en PDF a Excel en Argentina?">Free tool to turn a bank statement PDF into Excel (Argentina)</option>
+        <option value="¿Cómo paso el resumen de mi tarjeta Visa de Galicia de PDF a Excel?">Visa Galicia statement to Excel</option>
+        <option value="¿Qué es renglon.com.ar?">What is renglon.com.ar?</option>
+      </select></div>
+      <div class="row ailinks" id="aiLinks"></div>
+      <form id="aiForm" class="row">
+        <label for="aiEngine" class="sr">Assistant</label><select id="aiEngine"><option value="chatgpt">ChatGPT</option><option value="perplexity">Perplexity</option><option value="claude">Claude</option><option value="copilot">Copilot</option><option value="google_ai">Google AI Mode</option><option value="gemini">Gemini</option></select>
+        <label for="aiResult" class="sr">Result</label><select id="aiResult"><option value="linked">Named it with a link</option><option value="named">Named it, no link</option><option value="not_named">Did not name it</option></select>
+        <label for="aiNote" class="sr">Note</label><input id="aiNote" maxlength="200" placeholder="Note (optional): what it recommended instead">
+        <button type="submit">Save</button>
+      </form>
+      <ul class="list" id="aiChecks"></ul>
+      <p class="tag" id="visIndex"></p>
+    </section>
+
     <section class="card">
       <div class="row rowshead"><h2>Processed files (7 days)</h2><span class="tag">No file names or amounts are ever collected</span></div>
       <div class="tablewrap"><table>

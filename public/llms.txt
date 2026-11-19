@@ -1,0 +1,21 @@
+# Renglón
+
+> Renglón (https://renglon.com.ar) es un conversor gratuito de resúmenes bancarios y de tarjeta de crédito de Argentina: pasa el PDF del resumen a Excel (.xlsx) o CSV, con un movimiento por fila y control de saldos. El PDF se lee en el navegador de la persona y nunca se sube a un servidor. No hace falta registrarse.
+
+## Qué hace
+- Arma una fila por movimiento: fecha, descripción, referencia, débito, crédito, importe y saldo (cuentas), o tipo, comprobante, cuota, pesos y dólares (tarjetas).
+- Controla que el saldo anterior más los movimientos dé el saldo final, y marca las filas que no cierran.
+- Lee cuentas en pesos y en dólares, tarjetas con cuotas, y resúmenes con varias cuentas (cada una se controla aparte).
+- No lee escaneos ni fotos: hace falta el PDF original del home banking.
+- Está en prueba (beta). No es asesoramiento contable ni impositivo.
+
+## Bancos y tarjetas
+- Probado con resúmenes reales: Banco Galicia, ARQ, Visa.
+- Probado con resúmenes inventados con el diseño de cada uno: Santander, BBVA, Banco Macro, Banco Nación, Banco Comafi, Banco Hipotecario, Banco Patagonia, HSBC, Mercado Pago, Mastercard, American Express, Cabal.
+- Todavía sin probar (puede funcionar igual): Banco Provincia, Banco Ciudad, ICBC, Supervielle, Banco Credicoop, Bancor, Banco Santa Fe, Brubank, Ualá, Naranja X.
+
+## Páginas
+- [Conversor](https://renglon.com.ar/): subir el PDF y bajar el Excel.
+- [Bancos y tarjetas](https://renglon.com.ar/bancos/): qué se probó con cada banco, con una página por banco.
+- [Preguntas frecuentes](https://renglon.com.ar/preguntas/)
+- [Privacidad](https://renglon.com.ar/privacidad/): qué datos anónimos de uso se guardan; el archivo nunca.

@@ -4,7 +4,7 @@
 // through view -> select -> convert -> download. No persistent user id is kept.
 (function () {
   'use strict';
-  const VERSION = '0.4.1';
+  const VERSION = '0.5.0';
   const optOut = navigator.globalPrivacyControl === true || navigator.doNotTrack === '1';
   const rand = () => Array.from(crypto.getRandomValues(new Uint8Array(6)), b => (b % 36).toString(36)).join('') + Date.now().toString(36).slice(-4);
   let sid = null, returning = 0, owner = 0;
@@ -14,12 +14,18 @@
   try { sid = sessionStorage.getItem('td_sid'); if (!sid) { sid = rand(); sessionStorage.setItem('td_sid', sid); } } catch (e) { sid = rand(); }
   try { returning = localStorage.getItem('td_seen') ? 1 : 0; localStorage.setItem('td_seen', '1'); } catch (e) {}
 
+  // the site that had the link, domain only (never the full address), when it is another site
+  function refHost() {
+    try { const h = document.referrer ? new URL(document.referrer).hostname.toLowerCase().replace(/^www\./, '') : ''; return h && h !== location.hostname && h.length <= 60 ? h : undefined; } catch (e) { return undefined; }
+  }
   function refSource() {
     let host = '';
     try { host = document.referrer ? new URL(document.referrer).hostname.replace(/^www\./, '') : ''; } catch (e) {}
     if (!host || host === location.hostname) return 'direct';
-    const map = [['google', /google\./], ['bing', /bing\.com/], ['duckduckgo', /duckduckgo/], ['reddit', /reddit\.com/], ['facebook', /facebook\.com|fb\.com/], ['instagram', /instagram\.com/],
-      ['linkedin', /linkedin\.com/], ['x', /^(x|twitter|t)\.co(m)?$/], ['youtube', /youtube\.com/], ['whatsapp', /whatsapp\.com|wa\.me/], ['chatgpt', /chatgpt\.com|openai\.com/], ['perplexity', /perplexity\.ai/], ['email', /mail\./]];
+    const map = [['gemini', /gemini\.google\.com|bard\.google\.com/], ['copilot', /copilot\.microsoft\.com|copilot\.cloud\.microsoft/], ['chatgpt', /chatgpt\.com|openai\.com/],
+      ['perplexity', /perplexity\.ai/], ['claude', /claude\.ai/], ['deepseek', /deepseek\.com/], ['grok', /grok\.com/], ['meta_ai', /meta\.ai/], ['you', /^you\.com$/],
+      ['google', /google\./], ['bing', /bing\.com/], ['yahoo', /yahoo\./], ['ecosia', /ecosia\.org/], ['brave', /search\.brave\.com/], ['duckduckgo', /duckduckgo/], ['reddit', /reddit\.com/], ['facebook', /facebook\.com|fb\.com/], ['instagram', /instagram\.com/],
+      ['linkedin', /linkedin\.com/], ['x', /^(x|twitter|t)\.co(m)?$/], ['youtube', /youtube\.com/], ['whatsapp', /whatsapp\.com|wa\.me/], ['email', /mail\./]];
     for (const [k, re] of map) if (re.test(host)) return k;
     return 'other';
   }
@@ -42,5 +48,5 @@
     send('jserror', { error: name });
   });
   window.TaxDropTelemetry = { send, newFileId: rand, off: optOut };
-  send('view', { ref: refSource(), utm, returning });
+  send('view', { ref: refSource(), ref_host: refHost(), utm, returning });
 })();

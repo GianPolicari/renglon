@@ -6,7 +6,10 @@
 //     ADMIN_HOST  the usage monitor at its root.
 //     any other   test copy (test.renglon.com.ar, preview URLs): same site, stores nothing, not indexed.
 // - POST /api/event      anonymous usage rs_events (no IP, no file content, no amounts).
-// - GET  /api/admin/*    dashboard data, requires the ADMIN_TOKEN secret.
+// - GET  /api/admin/*    dashboard data, requires the ADMIN_TOKEN secret (a few POSTs for the visibility section).
+// - scheduled (daily)    mentions scan and IndexNow notice, see visibility.js.
+
+import { logCrawl, scanMentions, pingIndexNow, adminVisibility, adminVisibilityPost, VIS_REF_SOURCES } from './visibility.js';
 
 const MAX_BODY = 2048;                 // bytes per event
 const DAILY_EVENT_CAP = 50000;         // hard stop to stay far inside the D1 free tier
@@ -18,11 +21,11 @@ const SOFTWARE = new Set(['cuenta', 'tarjeta', 'other']);
 const BROKERS = new Set(['galicia', 'santander', 'nacion', 'provincia', 'bbva', 'macro', 'ciudad', 'icbc', 'supervielle', 'patagonia', 'credicoop', 'hsbc', 'bancor', 'santafe', 'hipotecario', 'comafi', 'columbia', 'brubank', 'arq', 'uala', 'mercadopago', 'naranjax', 'amex', 'visa', 'mastercard', 'cabal', 'sample', 'unknown']);
 const FORMATS = new Set(['xlsx', 'csv']);
 const PAGES = new Set(['/', '/admin', '/preguntas', '/privacidad', '/terminos', '/404']);
-const REF_SOURCES = new Set(['direct', 'google', 'bing', 'duckduckgo', 'reddit', 'facebook', 'instagram', 'linkedin', 'x', 'youtube', 'whatsapp', 'chatgpt', 'perplexity', 'email', 'other']);
+const REF_SOURCES = new Set(['direct', 'google', 'bing', 'duckduckgo', 'reddit', 'facebook', 'instagram', 'linkedin', 'x', 'youtube', 'whatsapp', 'chatgpt', 'perplexity', 'email', 'other', ...VIS_REF_SOURCES]);
 const DEVICES = new Set(['desktop', 'mobile', 'tablet']);
 const FEEDBACK = new Set(['totals_match', 'totals_differ']);
 // columns added after the first release; created on the fly if missing
-const EXTRA_COLUMNS = { sid: 'TEXT', fid: 'TEXT', ref: 'TEXT', utm: 'TEXT', device: 'TEXT', flagged: 'INTEGER', repeat_visit: 'INTEGER', feedback: 'TEXT', owner: 'INTEGER', bot: 'TEXT' };
+const EXTRA_COLUMNS = { sid: 'TEXT', fid: 'TEXT', ref: 'TEXT', utm: 'TEXT', device: 'TEXT', flagged: 'INTEGER', repeat_visit: 'INTEGER', feedback: 'TEXT', owner: 'INTEGER', bot: 'TEXT', ref_host: 'TEXT' };
 
 const SCHEMA = `CREATE TABLE IF NOT EXISTS rs_events (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -197,6 +200,8 @@ async function handleEvent(request, env) {
     feedback: pick(e.feedback, FEEDBACK),
     owner: e.owner === 1 ? 1 : 0,
     bot: botReason(request, e),
+    // the site that had the link (domain only, never the full address)
+    ref_host: (typeof e.ref_host === 'string' && /^[a-z0-9-]+(\.[a-z0-9-]+)+$/.test(e.ref_host) && e.ref_host.length <= 60) ? e.ref_host : null,
   };
   const cols = Object.keys(row);
   await db.prepare(`INSERT INTO rs_events (${cols.join(',')}) VALUES (${cols.map(() => '?').join(',')})`).bind(...cols.map(c => row[c])).run();
@@ -240,8 +245,9 @@ async function handleLayout(request, env) {
   return json({ ok: true });
 }
 
+const ADMIN_POST = new Set(['/api/admin/aicheck', '/api/admin/alerts', '/api/admin/scan']);
 async function handleAdmin(request, env, path) {
-  if (request.method !== 'GET') return json({ error: 'method' }, 405);
+  if (request.method !== 'GET' && !(request.method === 'POST' && ADMIN_POST.has(path))) return json({ error: 'method' }, 405);
   if (env.ADMIN_LIMIT) {
     const ip = request.headers.get('CF-Connecting-IP') || 'unknown';
     const { success } = await env.ADMIN_LIMIT.limit({ key: ip });
@@ -254,6 +260,15 @@ async function handleAdmin(request, env, path) {
   if (!db) return json({ error: 'no_database' }, 503);
   await ensureSchema(db);
 
+  if (request.method === 'POST') {
+    if (!(request.headers.get('Content-Type') || '').startsWith('application/json')) return json({ error: 'type' }, 415);
+    const text = await request.text();
+    if (text.length > 2048) return json({ error: 'size' }, 413);
+    let body; try { body = JSON.parse(text); } catch { return json({ error: 'json' }, 400); }
+    const out = await adminVisibilityPost(db, env, path, body && typeof body === 'object' ? body : {});
+    return out ? json(out, out.error ? 400 : 200) : json({ error: 'not_found' }, 404);
+  }
+  if (path === '/api/admin/visibility') return json(await adminVisibility(db));
   if (path === '/api/admin/feed') {
     const since = Number(new URL(request.url).searchParams.get('since') || 0);
     const { results } = await db.prepare('SELECT * FROM rs_events WHERE id > ? ORDER BY id DESC LIMIT 200').bind(Number.isFinite(since) ? since : 0).all();
@@ -358,7 +373,11 @@ async function handlePage(request, env, url) {
 }
 
 export default {
-  async fetch(request, env) {
+  // once a day (wrangler.jsonc triggers): look for mentions of the site and tell search engines about changed pages
+  async scheduled(event, env, ctx) {
+    ctx.waitUntil(Promise.allSettled([scanMentions(env), pingIndexNow(env)]));
+  },
+  async fetch(request, env, ctx) {
     const url = new URL(request.url);
     try {
       if (url.pathname === '/api/event') return await handleEvent(request, env);
@@ -370,6 +389,8 @@ export default {
       return json({ error: 'server' }, 500);
     }
     if (url.pathname === '/' || url.pathname === '/robots.txt' || url.pathname === '/admin' || url.pathname.startsWith('/admin/')) {
+      // search engines and AI crawlers that read the public site (bot name only)
+      if ((url.pathname === '/' || url.pathname === '/robots.txt') && hostList(env.PROD_HOSTS).includes(url.hostname.toLowerCase()) && ctx) ctx.waitUntil(logCrawl(env, request, url.pathname));
       return handlePage(request, env, url);
     }
     return env.ASSETS.fetch(request);

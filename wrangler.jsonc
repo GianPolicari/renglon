@@ -14,6 +14,8 @@
     // the worker also sees the home page, /admin and robots.txt to tell prod, admin and test apart
     "run_worker_first": ["/api/*", "/", "/admin", "/admin/*", "/robots.txt"]
   },
+  // daily at 08:17 Buenos Aires: mentions scan and IndexNow notice (src/visibility.js)
+  "triggers": { "crons": ["17 11 * * *"] },
   // Same D1 database as Cleanbasis (same Cloudflare account); this app uses its own tables (rs_*).
   "d1_databases": [
     { "binding": "DB", "database_name": "taxdrop-telemetry", "database_id": "1b18aef6-060e-43e8-bd79-c0512b6b31f7" }
