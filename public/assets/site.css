@@ -161,12 +161,15 @@ details.more > .in{padding:0 18px 18px}
 .foot{border-top:1px solid var(--line);background:var(--surface)}
 .foot .in{max-width:1120px;margin:0 auto;padding:22px 24px 30px;color:var(--muted);font-size:14px}
 .foot nav{display:flex;flex-wrap:wrap;gap:6px 24px;margin-bottom:8px}
-.foot nav a{color:var(--muted);text-decoration:none}
+.foot nav a{color:var(--muted);text-decoration:none;display:inline-block;padding:4px 0}
 .foot nav a:hover{color:var(--ink)}
 .foot p{margin:0}
 
 @media (max-width:860px){
-  .hero{grid-template-columns:1fr;gap:32px}
+  .hero{grid-template-columns:1fr;gap:24px}
+  /* on a phone the upload panel comes right after the pitch, before the three facts */
+  .hero > div:first-child{display:contents}
+  .hero h1{order:1}.hero .lede{order:2;margin:0}.hero .panel{order:3}.hero .facts{order:4}
   .how ol{grid-template-columns:1fr;gap:18px}
 }
 @media (max-width:640px){
@@ -180,3 +183,4 @@ details.more > .in{padding:0 18px 18px}
   .foot .in{padding:20px 16px 28px}
 }
 @media (prefers-reduced-motion:reduce){*{transition:none!important}}
+input[type=checkbox]{width:18px;height:18px;accent-color:var(--accent);vertical-align:-3px}

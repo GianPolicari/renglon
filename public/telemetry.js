@@ -8,6 +8,8 @@
   const optOut = navigator.globalPrivacyControl === true || navigator.doNotTrack === '1';
   const rand = () => Array.from(crypto.getRandomValues(new Uint8Array(6)), b => (b % 36).toString(36)).join('') + Date.now().toString(36).slice(-4);
   let sid = null, returning = 0, owner = 0;
+  // "#soy-yo" (a link from the admin panel; fragments never reach the server) marks this browser as the owner's
+  try { if (location.hash === '#soy-yo') { localStorage.setItem('td_owner', '1'); history.replaceState(null, '', location.pathname + location.search); } } catch (e) {}
   try { owner = localStorage.getItem('td_owner') === '1' ? 1 : 0; } catch (e) {}
   try { sid = sessionStorage.getItem('td_sid'); if (!sid) { sid = rand(); sessionStorage.setItem('td_sid', sid); } } catch (e) { sid = rand(); }
   try { returning = localStorage.getItem('td_seen') ? 1 : 0; localStorage.setItem('td_seen', '1'); } catch (e) {}
