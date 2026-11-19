@@ -46,14 +46,18 @@ def statement(path, title, accounts, heads, *, date, numstyle='comma', neg='pref
             else: text(x, y, lab, al == 'r')
         c.setFont('Helvetica', 8)
         return y - 14
+    pre = ['']
     def money(role, v, y):
         if v is None or role not in role_x: return
-        text(role_x[role], y, num(v, numstyle, neg), True)
+        s = num(v, numstyle, neg)
+        if pre[0]: s = ('-' + pre[0] + ' ' + s[1:]) if v < 0 else (pre[0] + ' ' + s)   # "$ 1.234,56", "-U$S 59,64"
+        text(role_x[role], y, s, True)
     y = H - 50
     c.setFont('Helvetica-Bold', 11); text(40, y, title); c.setFont('Helvetica', 8)
     text(40, y - 14, 'Resumen sintetico para pruebas - datos inventados'); y -= 50
     exp = []
-    for subtitle, open_bal, mv in accounts:
+    for acc in accounts:
+        subtitle, open_bal, mv = acc[:3]; pre[0] = acc[3] if len(acc) > 3 else ''
         if y < 160: c.showPage(); y = H - 60
         c.setFont('Helvetica-Bold', 9); text(40, y, subtitle); y -= 18
         y = header(y)
@@ -144,6 +148,12 @@ def build(suf):
     for i, m in enumerate(mv): m['ref'] = str(80000000000 + i * 7919); m['desc'] = 'Compra de dólares' if m['amt'] > 0 else 'Venta de dólares'
     out['mercadopago_usd'] = statement('mercadopago_usd' + suf + '.pdf', 'Billetera Ejemplo - Resumen de dolares', [('DETALLE DE MOVIMIENTOS DEL PERIODO', 300.0, mv)],
         heads, date=lambda d: f"{d:02d}-09-2026", amount_col=True, local=1450.0, opening='Saldo inicial', closing='Saldo final')
+    # Santander: pesos and dollars in the same statement, amounts with their currency sign ("$ 1.234,56", "-U$S 59,64")
+    heads = [('Fecha', 40, 'l', 'date'), ('Comprobante', 90, 'l', 'ref'), ('Movimiento', 160, 'l', 'desc'), ('Débito', 400, 'r', 'debit'), ('Crédito', 470, 'r', 'credit'), ('Saldo en cuenta', 560, 'r', 'balance')]
+    out['santander_dual'] = statement('santander_dual' + suf + '.pdf', 'Banco Ejemplo Rojo', [
+        ('Movimientos en pesos', 87000.0, moves(14, 91, 87000.0), '$'),
+        ('Movimientos en dólares', 2300.0, moves(5, 92, 2300.0, 20, 600), 'U$S')],
+        heads, date=std, debit_signed=True, opening='Saldo Inicial', closing='Saldo total')
     return out
 
 if __name__ == '__main__':

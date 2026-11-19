@@ -356,5 +356,35 @@
   "rows": 16,
   "opening": 300.0,
   "closing": 4.51
+ },
+ "santander_dual": {
+  "rows": 19,
+  "sections": [
+   {
+    "opening": 87000.0,
+    "closing": -508370.79,
+    "rows": 14
+   },
+   {
+    "opening": 2300.0,
+    "closing": 1691.68,
+    "rows": 5
+   }
+  ]
+ },
+ "santander_dual_chars": {
+  "rows": 19,
+  "sections": [
+   {
+    "opening": 87000.0,
+    "closing": -508370.79,
+    "rows": 14
+   },
+   {
+    "opening": 2300.0,
+    "closing": 1691.68,
+    "rows": 5
+   }
+  ]
  }
 }
