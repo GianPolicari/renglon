@@ -186,11 +186,19 @@ details.more > .in{padding:0 18px 18px}
 input[type=checkbox]{width:18px;height:18px;accent-color:var(--accent);vertical-align:-3px}
 
 /* bank pages */
-.bank ul,.banklist{margin:8px 0 14px;padding-left:20px;line-height:1.55}
-.bank li,.banklist li{margin:4px 0}
+.bank ul{margin:8px 0 14px;padding-left:20px;line-height:1.55}
+.bank li{margin:4px 0}
 .bank h3{font:600 17px/1.3 var(--serif);margin:18px 0 4px}
-.bank .others{color:var(--muted);font-size:14px}
-.banklist{list-style:none;padding:0}
-.banklist li{padding:10px 0;border-bottom:1px solid var(--line)}
-.banklist li a{font-weight:600}
-.banklist small{color:var(--muted)}
+.bgrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:12px;margin:14px 0}
+.bgrid.compact{grid-template-columns:repeat(auto-fill,minmax(165px,1fr));gap:10px}
+.bcard{display:flex;flex-direction:column;align-items:flex-start;gap:4px;padding:14px 16px;background:var(--surface);border:1px solid var(--line);border-radius:var(--r-lg);color:var(--ink);text-decoration:none;transition:border-color .15s}
+.bcard b{font:600 18px/1.25 var(--serif)}
+.bcard span{color:var(--muted);font-size:14px;line-height:1.35}
+.bcard .badge{margin-top:6px}
+.bgrid.compact .bcard{padding:11px 14px}
+.bgrid.compact .bcard b{font-size:16px}
+.bgrid.compact .bcard span{font-size:13px}
+.bcard:hover{border-color:var(--navy);box-shadow:inset 3px 0 0 var(--brass)}
+.bcard:focus-visible{outline:2px solid var(--link);outline-offset:2px}
+.more-link{font-size:15px}
+@media (prefers-reduced-motion:reduce){.bcard{transition:none}}

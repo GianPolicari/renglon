@@ -68,52 +68,61 @@ def page(path, title, desc, body, page_id, kind='other', scripts=(), prose=True,
 
 # Bank pages: only what was actually tested. 'real' = real statements; 'shape' = invented statements with that bank's layout.
 BANKS = [
- dict(slug='galicia', name='Banco Galicia', short='Galicia', level='real',
+ dict(slug='galicia', line='Tarjeta Visa y cuentas', name='Banco Galicia', short='Galicia', level='real',
       tested=['Tarjeta Visa: probado con resúmenes reales.', 'Caja de ahorro y cuenta corriente: probado con resúmenes inventados con el diseño de Galicia y de Galicia Plus.'],
       reads=['Crédito antes que Débito y la columna Origen, como los trae la cuenta.', 'Fechas como "05/SEP" sin año: el año sale de otras fechas del resumen.', 'En la tarjeta: cuotas (03/06), pesos y dólares por separado, impuestos y el pago del mes.']),
- dict(slug='santander', name='Santander', short='Santander', level='shape',
+ dict(slug='santander', line='Cuentas en pesos y dólares, y tarjeta', name='Santander', short='Santander', level='shape',
       tested=['Cuenta y tarjeta: probado con resúmenes inventados con el diseño de Santander.'],
       reads=['La fecha centrada entre dos renglones de un mismo movimiento.', 'Importes escritos con su signo de moneda, como "$ 1.234,56" o "-U$S 59,64".', 'Pesos y dólares en el mismo resumen: cada parte se controla con sus propios saldos.', 'Columnas separadas para caja de ahorro y cuenta corriente, con un solo saldo.', 'En la tarjeta: fechas como "26 Octubre 05" seguidas solo del día.']),
- dict(slug='bbva', name='BBVA', short='BBVA', level='shape',
+ dict(slug='bbva', line='Varias cuentas en un mismo resumen', name='BBVA', short='BBVA', level='shape',
       tested=['Cuenta: probado con resúmenes inventados con el diseño de BBVA.', 'Tarjetas Visa y Mastercard procesadas por Prisma: probado con resúmenes inventados de ese diseño.'],
       reads=['Varias cuentas en el mismo resumen (pesos, dólares, euros), cada una con su control.', 'Débitos escritos con signo menos dentro de la columna Débito.', 'El cierre como "SALDO AL 30 DE SEPTIEMBRE".', 'Cuentas sin movimientos ("SIN MOVIMIENTOS"), que se saltean.']),
- dict(slug='macro', name='Banco Macro', short='Macro', level='shape',
+ dict(slug='macro', line='Caja de ahorro en pesos y en dólares', name='Banco Macro', short='Macro', level='shape',
       tested=['Cuenta: probado con resúmenes inventados con el diseño de Macro.'],
       reads=['Un "Detalle de movimiento" por cuenta (pesos y dólares), cada uno controlado aparte.', 'El saldo inicial como "SALDO ULTIMO EXTRACTO AL" y el final como "SALDO FINAL AL DIA".', 'La columna Referencia separada de la descripción.']),
- dict(slug='nacion', name='Banco Nación', short='Nación', level='shape',
+ dict(slug='nacion', line='Cuenta corriente y caja de ahorro', name='Banco Nación', short='Nación', level='shape',
       tested=['Cuenta: probado con resúmenes inventados con el diseño de Banco Nación.'],
       reads=['Las filas "TRANSPORTE" del corte de página, que no son movimientos.', 'Saldos negativos con el signo menos al final ("1.234,56-").', 'La columna COMPROB. como referencia.']),
- dict(slug='comafi', name='Banco Comafi', short='Comafi', level='shape',
+ dict(slug='comafi', line='Varias cuentas en un mismo resumen', name='Banco Comafi', short='Comafi', level='shape',
       tested=['Cuenta: probado con resúmenes inventados con el diseño de Comafi.'],
       reads=['Varias cuentas en el mismo resumen, con los títulos de las columnas repetidos en cada una.', 'Las filas "Transporte" y "SIN MOVIMIENTOS".', 'Descripciones que siguen en el renglón de abajo (por ejemplo el CUIT de una transferencia).', '"Saldo Anterior" y "Saldo al:" para el control.']),
- dict(slug='hipotecario', name='Banco Hipotecario', short='Hipotecario', level='shape',
+ dict(slug='hipotecario', line='Tres diseños de cuenta', name='Banco Hipotecario', short='Hipotecario', level='shape',
       tested=['Cuenta: probado con resúmenes inventados con tres diseños distintos de Banco Hipotecario.'],
       reads=['Resúmenes que listan del movimiento más nuevo al más viejo: en el Excel quedan ordenados por fecha.', 'Saldo solo al cierre de cada día ("SALDO FINAL DEL DIA"): se usa como control.', 'Títulos de columna escritos en dos renglones, como "IMPORTE / MONEDA".', 'El destinatario de una transferencia en renglones aparte.']),
- dict(slug='patagonia', name='Banco Patagonia', short='Patagonia', level='shape',
+ dict(slug='patagonia', line='Cuenta corriente', name='Banco Patagonia', short='Patagonia', level='shape',
       tested=['Cuenta: probado con resúmenes inventados con el diseño de Banco Patagonia.'],
       reads=['Dos columnas de fecha (FECHA y FECHA VALOR): se usa la primera.', 'Saldos negativos con el signo menos al final.']),
- dict(slug='hsbc', name='HSBC', short='HSBC', level='shape',
+ dict(slug='hsbc', line='Cuenta corriente', name='HSBC', short='HSBC', level='shape',
       tested=['Cuenta corriente: probado con resúmenes inventados con el diseño de HSBC.'],
       reads=['Importes con punto decimal ("1,234.56") en lugar de coma.', 'El signo menos al final del número.', 'Fechas como "05/SEP" sin año.']),
- dict(slug='mercado-pago', name='Mercado Pago', short='Mercado Pago', level='shape',
+ dict(slug='mercado-pago', line='Resumen en dólares', name='Mercado Pago', short='Mercado Pago', level='shape',
       tested=['Resumen de dólares: probado con resúmenes inventados con su diseño.', 'Resumen de la cuenta en pesos: todavía no lo probamos.'],
       reads=['Fechas como "05-09-2026".', 'Cuántos pesos se usaron en cada compra o venta de dólares, en la columna "Monto local" del Excel.', 'La cotización del dólar de cada fila, que no se mezcla con los importes.']),
- dict(slug='arq', name='ARQ', short='ARQ', level='real',
+ dict(slug='arq', line='Billetera en dólares', name='ARQ', short='ARQ', level='real',
       tested=['Billetera en dólares: probado con resúmenes reales.'],
       reads=['Fechas en inglés como "Oct 09" y números con punto decimal.', 'Montos de 0 a 2 decimales con su signo ("+ 35.2", "- 100").', 'El equivalente en moneda local de cada movimiento, en "Moneda local" y "Monto local".', 'El saldo de cada fila, calculado desde el balance de inicio porque el resumen no lo trae.']),
- dict(slug='visa', name='Visa', short='Visa', level='real', card=True,
+ dict(slug='visa', line='De cualquier banco', name='Visa', short='Visa', level='real', card=True,
       tested=['Probado con resúmenes reales de Visa de Banco Galicia y con ejemplos inventados de otros proyectos y de Prisma.'],
       reads=['Consumos, cuotas (03/06), impuestos, cargos y el pago del mes, cada uno con su tipo.', 'Pesos y dólares en columnas separadas, cada moneda con su control.', 'El total de consumos de cada tarjeta adicional.']),
- dict(slug='mastercard', name='Mastercard', short='Mastercard', level='shape', card=True,
+ dict(slug='mastercard', line='De cualquier banco', name='Mastercard', short='Mastercard', level='shape', card=True,
       tested=['Probado con resúmenes inventados con el diseño de Prisma y de Fiserv.'],
       reads=['Fechas como "05 Oct 26".', 'El número de cupón separado de la descripción.', 'Pesos y dólares por separado, con el control de cada moneda.']),
- dict(slug='american-express', name='American Express', short='American Express', level='shape', card=True,
+ dict(slug='american-express', line='Pesos y dólares', name='American Express', short='American Express', level='shape', card=True,
       tested=['Probado con resúmenes inventados con el diseño de American Express.'],
       reads=['Las columnas "Importe en $" e "Importe en U$S".', 'Cuotas escritas dentro de la descripción.']),
- dict(slug='cabal', name='Cabal', short='Cabal', level='shape', card=True,
+ dict(slug='cabal', line='De cualquier banco', name='Cabal', short='Cabal', level='shape', card=True,
       tested=['Probado con un resumen de ejemplo de otro proyecto de código abierto.'],
       reads=['Consumos, cuotas, impuestos y pagos en pesos y en dólares.']),
 ]
+
+def bank_card(b, compact=False):
+    badge = '' if compact else (f'<span class="badge ok">Resúmenes reales</span>' if b['level'] == 'real' else '<span class="badge warn">Ejemplos inventados</span>')
+    return f'<a class="bcard" href="/bancos/{b["slug"]}/"><b>{b["name"]}</b><span>{b["line"]}</span>{badge}</a>'
+
+def bank_grid(items, compact=False):
+    return f'<div class="bgrid{" compact" if compact else ""}">' + ''.join(bank_card(b, compact) for b in items) + '</div>'
+
+CARDS_NOTE = 'El resumen de la tarjeta lo arma la procesadora (Prisma, Fiserv o la propia marca), no el banco: una Visa de un banco se parece mucho a la de otro. Si tu banco no está, entrá por tu tarjeta.'
 
 def bank_pages():
     for b in BANKS:
@@ -124,7 +133,7 @@ def bank_pages():
                 'Gratis, y el archivo se lee en tu navegador: nunca se sube a ningún servidor.')
         status = ('<span class="badge ok">Probado con resúmenes reales</span>' if b['level'] == 'real'
                   else '<span class="badge warn">Probado con ejemplos inventados</span>')
-        others = ', '.join(f'<a href="/bancos/{o["slug"]}/">{o["short"]}</a>' for o in BANKS if o is not b)
+        same = [o for o in BANKS if o is not b and bool(o.get('card')) == bool(b.get('card'))]
         extra = f'''
   <section class="step bank">
     <h2>El resumen de {b["short"]}</h2>
@@ -133,17 +142,28 @@ def bank_pages():
     <h3>Qué tiene en cuenta</h3>
     <ul>{''.join(f'<li>{html.escape(t)}</li>' for t in b['reads'])}</ul>
     <p>Los resúmenes cambian de diseño con el tiempo. Si el tuyo no sale bien, podés mandarnos solo su diseño, sin tus datos, desde esta misma página. {NAME} no está vinculado con {b["name"]}.</p>
-    <p class="others">Otros: {others}.</p>
+  </section>
+  <section class="step">
+    <h2>{'Otras tarjetas' if b.get('card') else 'Otros bancos y billeteras'}</h2>
+    {bank_grid(same, compact=True)}
+    <p class="more-link"><a href="/bancos/">{'Ver los bancos' if b.get('card') else 'Ver también las tarjetas de crédito'}</a></p>
   </section>'''
         page(f'bancos/{b["slug"]}', f'Resumen de {noun} a Excel, gratis | {NAME}',
              f'Pasá el resumen PDF de tu {noun} a Excel con un movimiento por fila y control de saldos. Gratis y sin subir el archivo.',
              converter(h1, lede, extra), f'/bancos/{b["slug"]}', prose=False, scripts=['/resumen.js', '/xlsx-lite.js', '/app.js'])
-    rows = ''.join(f'<li><a href="/bancos/{b["slug"]}/">{b["name"]}</a> <span class="badge {"ok" if b["level"] == "real" else "warn"}">'
-                   f'{"Resúmenes reales" if b["level"] == "real" else "Ejemplos inventados"}</span><br><small>{html.escape(" ".join(b["tested"]))}</small></li>' for b in BANKS)
+    banks = [b for b in BANKS if not b.get('card')]; cards = [b for b in BANKS if b.get('card')]
     body = f'''  <h1>Bancos y tarjetas</h1>
-  <p class="lede">{NAME} lee los títulos de las columnas del resumen (Fecha, Concepto, Débitos, Créditos, Saldo, Pesos, Dólares) en lugar de usar una plantilla fija, así que también puede andar con bancos que no están en esta lista. Esto es lo que probamos.</p>
-  <ul class="banklist">{rows}</ul>
-  <p>¿Tu banco no está o no sale bien? <a href="/">Probalo igual</a>: si no se puede leer, podés mandarnos solo su diseño, sin tus datos. Así se suman bancos nuevos.</p>'''
+  <p class="lede">{NAME} lee los títulos de las columnas del resumen en lugar de usar una plantilla fija, así que también puede andar con bancos que no están acá. Esto es lo que probamos.</p>
+  <section class="step">
+    <h2>Bancos y billeteras</h2>
+    {bank_grid(banks)}
+  </section>
+  <section class="step">
+    <h2>Tarjetas de crédito</h2>
+    <p>{CARDS_NOTE}</p>
+    {bank_grid(cards)}
+  </section>
+  <p class="notice">"Resúmenes reales": probado con resúmenes de verdad. "Ejemplos inventados": probado con resúmenes armados con el diseño de ese banco y datos inventados. ¿El tuyo no sale bien? <a href="/">Probalo igual</a>: si no se puede leer, podés mandarnos solo su diseño, sin tus datos.</p>'''
     page('bancos', f'Bancos y tarjetas que lee | {NAME}', 'Qué bancos y tarjetas de Argentina probamos para pasar el resumen PDF a Excel, y con qué resúmenes.', body, '/bancos')
 
 def converter(h1, lede, extra=''):
@@ -217,11 +237,13 @@ def converter(h1, lede, extra=''):
   </section>'''
 
 def home():
-    links = ', '.join(f'<a href="/bancos/{b["slug"]}/">{b["name"]}</a>' for b in BANKS)
     extra = f'''
   <section class="step">
-    <h2>Bancos y tarjetas</h2>
-    <p>Lee los títulos de las columnas en lugar de usar una plantilla fija. Qué probamos con cada uno: {links}. <a href="/bancos/">Ver todos</a>.</p>
+    <h2>Bancos y tarjetas probados</h2>
+    {bank_grid([b for b in BANKS if not b.get('card')], compact=True)}
+    <p>{CARDS_NOTE}</p>
+    {bank_grid([b for b in BANKS if b.get('card')], compact=True)}
+    <p class="more-link"><a href="/bancos/">Qué probamos con cada uno</a></p>
   </section>'''
     body = converter('Tu resumen del banco o de la tarjeta, en Excel',
                      'Un movimiento por fila, con los saldos controlados. El PDF se lee en tu navegador y nunca se sube a ningún servidor.', extra)
