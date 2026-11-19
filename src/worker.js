@@ -22,7 +22,7 @@ const REF_SOURCES = new Set(['direct', 'google', 'bing', 'duckduckgo', 'reddit',
 const DEVICES = new Set(['desktop', 'mobile', 'tablet']);
 const FEEDBACK = new Set(['totals_match', 'totals_differ']);
 // columns added after the first release; created on the fly if missing
-const EXTRA_COLUMNS = { sid: 'TEXT', fid: 'TEXT', ref: 'TEXT', utm: 'TEXT', device: 'TEXT', flagged: 'INTEGER', repeat_visit: 'INTEGER', feedback: 'TEXT', owner: 'INTEGER' };
+const EXTRA_COLUMNS = { sid: 'TEXT', fid: 'TEXT', ref: 'TEXT', utm: 'TEXT', device: 'TEXT', flagged: 'INTEGER', repeat_visit: 'INTEGER', feedback: 'TEXT', owner: 'INTEGER', bot: 'TEXT' };
 
 const SCHEMA = `CREATE TABLE IF NOT EXISTS rs_events (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -52,6 +52,8 @@ const LAYOUT_SCHEMA = `CREATE TABLE IF NOT EXISTS rs_layouts (
 const MAX_LAYOUT = 16384;
 const DAILY_LAYOUT_CAP = 300;
 
+const EXT_VIEW = 'CREATE VIEW rs_ext AS SELECT * FROM rs_events WHERE COALESCE(owner, 0) = 0 AND bot IS NULL';
+
 let schemaReady = false;
 async function ensureSchema(db) {
   if (schemaReady) return;
@@ -61,8 +63,10 @@ async function ensureSchema(db) {
   const have = new Set(results.map(r => r.name));
   const add = Object.entries(EXTRA_COLUMNS).filter(([c]) => !have.has(c)).map(([c, t]) => db.prepare(`ALTER TABLE rs_events ADD COLUMN ${c} ${t}`));
   if (add.length) await db.batch(add);
-  // statistics ignore the owner's own visits; the live feed and file list still show them, labelled
-  await db.prepare('CREATE VIEW IF NOT EXISTS rs_ext AS SELECT * FROM rs_events WHERE COALESCE(owner, 0) = 0').run();
+  // statistics ignore the owner's own visits and automated ones; the live feed and file list still show them, labelled.
+  // The view is rebuilt when its definition changes (it predates the bot column).
+  const view = await db.prepare("SELECT sql FROM sqlite_master WHERE type='view' AND name='rs_ext'").first();
+  if (!view || view.sql !== EXT_VIEW) await db.batch([db.prepare('DROP VIEW IF EXISTS rs_ext'), db.prepare(EXT_VIEW)]);
   await db.batch([db.prepare('CREATE INDEX IF NOT EXISTS rs_events_fid ON rs_events(fid)'), db.prepare('CREATE INDEX IF NOT EXISTS rs_events_sid ON rs_events(sid)'), db.prepare(LAYOUT_SCHEMA)]);
   schemaReady = true;
 }
@@ -102,6 +106,22 @@ function browserFamily(ua) {
   if (/Safari\//.test(ua)) return 'safari';
   if (/bot|crawl|spider/i.test(ua)) return 'bot';
   return 'other';
+}
+
+// Why a visit looks automated, or null for a person. Only events sent by the page's own script reach here,
+// so these are programs that run JavaScript: crawlers, link previewers, uptime and security scanners.
+//   'auto'   the browser says it is remote-controlled (navigator.webdriver: Puppeteer, Playwright, Selenium)
+//   'ua'     the User-Agent names a crawler, a headless browser or an HTTP library
+//   'dc'     the connection comes from a cloud or hosting network, where people do not browse from
+// Cloudflare, Akamai and Fastly are left out of 'dc' on purpose: iCloud Private Relay sends real Safari users through them.
+const BOT_UA = /bot\b|bot\/|crawl|spider|slurp|scan|headless|lighthouse|pagespeed|gtmetrix|pingdom|uptime|facebookexternalhit|embedly|curl|wget|python|go-http|java\/|okhttp|axios|node-fetch|undici|scrapy|phantom|puppeteer|playwright|selenium/i;
+const DATACENTER = /google|amazon|aws|microsoft|azure|digitalocean|ovh|hetzner|linode|akamai connected cloud|oracle|alibaba|tencent|huawei cloud|vultr|choopa|contabo|leaseweb|scaleway|m247|datacamp|cdn77|colocrossing|hostinger|ionos|hostroyale|psychz|quadranet|servers\.com|g-core|gcore|constant|online s\.a\.s|netcup|hostwinds|interserver|limestone|tzulo|censys|shodan|internet measurement|palo alto|stark industries|pfcloud|aeza|kamatera|ipxo|dataforseo|semrush|ahrefs/i;
+function botReason(request, e) {
+  if (e.wd === 1) return 'auto';
+  if (BOT_UA.test(request.headers.get('User-Agent') || '')) return 'ua';
+  const org = (request.cf && request.cf.asOrganization) || '';
+  if (DATACENTER.test(org)) return 'dc';
+  return null;
 }
 
 // constant-time comparison for the admin token
@@ -176,6 +196,7 @@ async function handleEvent(request, env) {
     repeat_visit: e.returning === 1 ? 1 : (e.returning === 0 ? 0 : null),
     feedback: pick(e.feedback, FEEDBACK),
     owner: e.owner === 1 ? 1 : 0,
+    bot: botReason(request, e),
   };
   const cols = Object.keys(row);
   await db.prepare(`INSERT INTO rs_events (${cols.join(',')}) VALUES (${cols.map(() => '?').join(',')})`).bind(...cols.map(c => row[c])).run();
@@ -262,7 +283,7 @@ async function handleAdmin(request, env, path) {
   if (path === '/api/admin/files') {
     const week = Date.now() - 7 * 86400000;
     const { results } = await db.prepare(`SELECT c.id, c.ts, c.country, c.broker, c.outcome, c.error, c.pages, c.rows, c.sections, c.sections_ok,
-        c.flagged, c.ms, c.size_kb, c.ua, c.device, c.software, c.owner,
+        c.flagged, c.ms, c.size_kb, c.ua, c.device, c.software, c.owner, c.bot,
         (SELECT GROUP_CONCAT(DISTINCT d.format) FROM rs_events d WHERE d.type='download' AND d.fid=c.fid AND c.fid IS NOT NULL) AS downloads,
         (SELECT f.feedback FROM rs_events f WHERE f.type='feedback' AND f.fid=c.fid AND c.fid IS NOT NULL AND f.feedback LIKE 'import%' ORDER BY f.id DESC LIMIT 1) AS feedback,
         (SELECT f.feedback FROM rs_events f WHERE f.type='feedback' AND f.fid=c.fid AND c.fid IS NOT NULL AND f.feedback LIKE 'totals%' ORDER BY f.id DESC LIMIT 1) AS totals_feedback

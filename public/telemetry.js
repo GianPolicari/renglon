@@ -4,7 +4,7 @@
 // through view -> select -> convert -> download. No persistent user id is kept.
 (function () {
   'use strict';
-  const VERSION = '0.4.0';
+  const VERSION = '0.4.1';
   const optOut = navigator.globalPrivacyControl === true || navigator.doNotTrack === '1';
   const rand = () => Array.from(crypto.getRandomValues(new Uint8Array(6)), b => (b % 36).toString(36)).join('') + Date.now().toString(36).slice(-4);
   let sid = null, returning = 0, owner = 0;
@@ -28,7 +28,7 @@
 
   function send(type, data) {
     if (optOut) return;
-    const body = JSON.stringify(Object.assign({ type, version: VERSION, page: document.body.dataset.page, software: document.body.dataset.software, sid, device, owner: owner || undefined }, data || {}));
+    const body = JSON.stringify(Object.assign({ type, version: VERSION, page: document.body.dataset.page, software: document.body.dataset.software, sid, device, owner: owner || undefined, wd: navigator.webdriver ? 1 : undefined }, data || {}));
     if (body.length > 1800) return;
     try {
       fetch('/api/event', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body, keepalive: true, credentials: 'omit' }).catch(() => {});

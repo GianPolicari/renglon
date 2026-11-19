@@ -9,6 +9,8 @@
     clear() { try { sessionStorage.removeItem(KEY_NAME); localStorage.removeItem(KEY_NAME); } catch (e) {} },
   };
   const OUTCOME_CLASS = { ok: 'ok', mismatch: 'warn', no_rows: 'warn' };
+  const BOT_WHY = { auto: 'remote-controlled browser', ua: 'crawler or tool User-Agent', dc: 'cloud / hosting network' };
+  function botBadge(why) { const b = el('span', 'bot', 'badge'); b.title = BOT_WHY[why] || why; return b; }
   // flag, code and country name in the browser's language ("🇸🇰 SK · Eslovaquia"); Cloudflare sends XX or T1 when it can't tell
   let regionName = cc => cc;
   try { const dn = new Intl.DisplayNames([navigator.language, 'en'], { type: 'region' }); regionName = cc => { try { return dn.of(cc) || cc; } catch (e) { return cc; } }; } catch (e) {}
@@ -41,7 +43,7 @@
       const tr = el('tr'); if (isNew) tr.className = 'new';
       const t = new Date(e.ts);
       tr.append(el('td', t.toLocaleString(undefined, { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit', second: '2-digit' })));
-      const ctd = el('td', flag(e.country)); if (e.owner) ctd.append(' ', el('span', 'you', 'badge warn')); tr.append(ctd);
+      const ctd = el('td', flag(e.country)); if (e.owner) ctd.append(' ', el('span', 'you', 'badge warn')); if (e.bot) ctd.append(' ', botBadge(e.bot)); tr.append(ctd);
       tr.append(el('td', e.type + (e.format ? ' · ' + e.format : '')));
       const res = el('td'); if (e.outcome) res.append(el('span', e.outcome, 'badge ' + (OUTCOME_CLASS[e.outcome] || 'bad'))); tr.append(res);
       tr.append(el('td', e.error || ''));
@@ -107,7 +109,7 @@
       for (const f of files) {
         const tr = el('tr');
         tr.append(el('td', new Date(f.ts).toLocaleString(undefined, { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })));
-        const ctd = el('td', flag(f.country)); if (f.owner) ctd.append(' ', el('span', 'you', 'badge warn'));
+        const ctd = el('td', flag(f.country)); if (f.owner) ctd.append(' ', el('span', 'you', 'badge warn')); if (f.bot) ctd.append(' ', botBadge(f.bot));
         tr.append(ctd, el('td', f.broker || ''));
         const res = el('td'); if (f.outcome) res.append(el('span', f.outcome, 'badge ' + (OUTCOME_CLASS[f.outcome] || 'bad'))); tr.append(res);
         tr.append(el('td', f.error || ''), el('td', f.size_kb ?? '', 'n'), el('td', f.pages ?? '', 'n'), el('td', f.rows ?? '', 'n'), el('td', f.flagged ?? '', 'n'),
