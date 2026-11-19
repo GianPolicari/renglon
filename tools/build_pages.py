@@ -113,10 +113,23 @@ BANKS = [
  dict(slug='cabal', line='De cualquier banco', name='Cabal', short='Cabal', level='shape', card=True,
       tested=['Probado con un resumen de ejemplo de otro proyecto de código abierto.'],
       reads=['Consumos, cuotas, impuestos y pagos en pesos y en dólares.']),
+ dict(slug='provincia', line='Cuentas y tarjetas', name='Banco Provincia', short='Provincia', level='pending', tested=[], reads=[]),
+ dict(slug='ciudad', line='Cuentas y tarjetas', name='Banco Ciudad', short='Ciudad', level='pending', tested=[], reads=[]),
+ dict(slug='icbc', line='Cuentas y tarjetas', name='ICBC', short='ICBC', level='pending', tested=[], reads=[]),
+ dict(slug='supervielle', line='Cuentas y tarjetas', name='Supervielle', short='Supervielle', level='pending', tested=[], reads=[]),
+ dict(slug='credicoop', line='Cuentas y tarjetas', name='Banco Credicoop', short='Credicoop', level='pending', tested=[], reads=[]),
+ dict(slug='bancor', line='Cuentas y tarjetas', name='Bancor', short='Bancor', level='pending', tested=[], reads=[]),
+ dict(slug='santa-fe', line='Cuentas y tarjetas', name='Banco Santa Fe', short='Santa Fe', level='pending', tested=[], reads=[]),
+ dict(slug='brubank', line='Cuenta digital y tarjeta', name='Brubank', short='Brubank', level='pending', tested=[], reads=[]),
+ dict(slug='uala', line='Cuenta digital y tarjeta', name='Ualá', short='Ualá', level='pending', tested=[], reads=[]),
+ dict(slug='naranja-x', line='Cuenta digital y tarjeta', name='Naranja X', short='Naranja X', level='pending', tested=[], reads=[]),
 ]
 
+BADGE = {'real': ('ok', 'Resúmenes reales'), 'shape': ('warn', 'Ejemplos inventados'), 'pending': ('none', 'Sin probar todavía')}
+
 def bank_card(b, compact=False):
-    badge = '' if compact else (f'<span class="badge ok">Resúmenes reales</span>' if b['level'] == 'real' else '<span class="badge warn">Ejemplos inventados</span>')
+    cls, txt = BADGE[b['level']]
+    badge = '' if compact else f'<span class="badge {cls}">{txt}</span>'
     return f'<a class="bcard" href="/bancos/{b["slug"]}/"><b>{b["name"]}</b><span>{b["line"]}</span>{badge}</a>'
 
 def bank_grid(items, compact=False):
@@ -131,17 +144,22 @@ def bank_pages():
         h1 = f'Resumen de {"la " if b.get("card") else ""}{noun} a Excel'
         lede = (f'Pasá el resumen PDF de tu {noun} a Excel, con un movimiento por fila y los saldos controlados. '
                 'Gratis, y el archivo se lee en tu navegador: nunca se sube a ningún servidor.')
-        status = ('<span class="badge ok">Probado con resúmenes reales</span>' if b['level'] == 'real'
-                  else '<span class="badge warn">Probado con ejemplos inventados</span>')
-        same = [o for o in BANKS if o is not b and bool(o.get('card')) == bool(b.get('card'))]
+        status = {'real': '<span class="badge ok">Probado con resúmenes reales</span>', 'shape': '<span class="badge warn">Probado con ejemplos inventados</span>',
+                  'pending': '<span class="badge none">Sin probar todavía</span>'}[b['level']]
+        if b['level'] == 'pending':
+            b = dict(b, tested=[f'Todavía no tuvimos un resumen de {b["name"]} para probar. {NAME} lee los títulos de las columnas (Fecha, Concepto, Débitos, Créditos, Saldo) en lugar de usar una plantilla fija, así que puede funcionar igual: probalo.'],
+                     reads=['Si es el resumen de una tarjeta Visa o Mastercard de este banco, suele tener el mismo diseño que las de otros bancos: mirá las páginas de esas tarjetas.',
+                            'Si trae varias cuentas (pesos, dólares, cuenta corriente), cada una se controla por separado.',
+                            'Si no se puede leer, mandanos solo su diseño desde esta página y lo sumamos.'])
+        same = [o for o in BANKS if o['slug'] != b['slug'] and bool(o.get('card')) == bool(b.get('card'))]
         extra = f'''
   <section class="step bank">
     <h2>El resumen de {b["short"]}</h2>
     <p>{status}</p>
-    <ul>{''.join(f'<li>{html.escape(t)}</li>' for t in b['tested'])}</ul>
-    <h3>Qué tiene en cuenta</h3>
+    {f'<p>{html.escape(b["tested"][0])}</p>' if b['level'] == 'pending' else '<ul>' + ''.join(f'<li>{html.escape(t)}</li>' for t in b['tested']) + '</ul>'}
+    <h3>{'Qué tener en cuenta' if b['level'] == 'pending' else 'Qué tiene en cuenta'}</h3>
     <ul>{''.join(f'<li>{html.escape(t)}</li>' for t in b['reads'])}</ul>
-    <p>Los resúmenes cambian de diseño con el tiempo. Si el tuyo no sale bien, podés mandarnos solo su diseño, sin tus datos, desde esta misma página. {NAME} no está vinculado con {b["name"]}.</p>
+    <p>{'' if b['level'] == 'pending' else 'Los resúmenes cambian de diseño con el tiempo. Si el tuyo no sale bien, podés mandarnos solo su diseño, sin tus datos, desde esta misma página. '}{NAME} no está vinculado con {b["name"]}.</p>
   </section>
   <section class="step">
     <h2>{'Otras tarjetas' if b.get('card') else 'Otros bancos y billeteras'}</h2>
@@ -151,7 +169,7 @@ def bank_pages():
         page(f'bancos/{b["slug"]}', f'Resumen de {noun} a Excel, gratis | {NAME}',
              f'Pasá el resumen PDF de tu {noun} a Excel con un movimiento por fila y control de saldos. Gratis y sin subir el archivo.',
              converter(h1, lede, extra), f'/bancos/{b["slug"]}', prose=False, scripts=['/resumen.js', '/xlsx-lite.js', '/app.js'])
-    banks = [b for b in BANKS if not b.get('card')]; cards = [b for b in BANKS if b.get('card')]
+    banks = [b for b in BANKS if not b.get('card') and b['level'] != 'pending']; cards = [b for b in BANKS if b.get('card')]; pending = [b for b in BANKS if b['level'] == 'pending']
     body = f'''  <h1>Bancos y tarjetas</h1>
   <p class="lede">{NAME} lee los títulos de las columnas del resumen en lugar de usar una plantilla fija, así que también puede andar con bancos que no están acá. Esto es lo que probamos.</p>
   <section class="step">
@@ -162,6 +180,11 @@ def bank_pages():
     <h2>Tarjetas de crédito</h2>
     <p>{CARDS_NOTE}</p>
     {bank_grid(cards)}
+  </section>
+  <section class="step">
+    <h2>Todavía sin probar</h2>
+    <p>No tuvimos todavía un resumen de estos para probar. Pueden funcionar igual: probalo, y si no sale, mandanos solo su diseño, sin tus datos, desde la misma página.</p>
+    {bank_grid(pending)}
   </section>
   <p class="notice">"Resúmenes reales": probado con resúmenes de verdad. "Ejemplos inventados": probado con resúmenes armados con el diseño de ese banco y datos inventados. ¿El tuyo no sale bien? <a href="/">Probalo igual</a>: si no se puede leer, podés mandarnos solo su diseño, sin tus datos.</p>'''
     page('bancos', f'Bancos y tarjetas que lee | {NAME}', 'Qué bancos y tarjetas de Argentina probamos para pasar el resumen PDF a Excel, y con qué resúmenes.', body, '/bancos')
@@ -240,10 +263,10 @@ def home():
     extra = f'''
   <section class="step">
     <h2>Bancos y tarjetas probados</h2>
-    {bank_grid([b for b in BANKS if not b.get('card')], compact=True)}
+    {bank_grid([b for b in BANKS if not b.get('card') and b['level'] != 'pending'], compact=True)}
     <p>{CARDS_NOTE}</p>
     {bank_grid([b for b in BANKS if b.get('card')], compact=True)}
-    <p class="more-link"><a href="/bancos/">Qué probamos con cada uno</a></p>
+    <p class="more-link"><a href="/bancos/">Qué probamos con cada uno, y los que todavía no: Provincia, Ciudad, ICBC, Supervielle, Brubank, Ualá y más</a></p>
   </section>'''
     body = converter('Tu resumen del banco o de la tarjeta, en Excel',
                      'Un movimiento por fila, con los saldos controlados. El PDF se lee en tu navegador y nunca se sube a ningún servidor.', extra)

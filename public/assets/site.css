@@ -202,3 +202,4 @@ input[type=checkbox]{width:18px;height:18px;accent-color:var(--accent);vertical-
 .bcard:focus-visible{outline:2px solid var(--link);outline-offset:2px}
 .more-link{font-size:15px}
 @media (prefers-reduced-motion:reduce){.bcard{transition:none}}
+.badge.none{background:var(--soft);color:var(--muted)}
