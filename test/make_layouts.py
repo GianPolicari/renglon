@@ -106,7 +106,7 @@ def build(suffix):
 
 if __name__ == '__main__':
     os.makedirs(OUT, exist_ok=True)
-    exp = {}
+    exp = {k: v for k, v in json.load(open(os.path.join(OUT, 'expected.json'))).items() if k.startswith('../')} if os.path.exists(os.path.join(OUT, 'expected.json')) else {}
     for cw, suf in ((False, ''), (True, '_chars')):
         CHARWISE = cw
         for k, v in build(suf).items(): exp[k + suf] = v
@@ -147,4 +147,93 @@ if __name__ == '__main__':
     for cw, suf in ((False, ''), (True, '_chars')):
         CHARWISE = cw
         e['billetera' + suf] = wallet('billetera' + suf + '.pdf')
+    json.dump(e, open(os.path.join(OUT, 'expected.json'), 'w'), indent=1)
+
+
+MONTHS_ES = ['Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio', 'Julio', 'Agosto', 'Setiem.', 'Octubre', 'Noviem.', 'Diciem.']
+COMERCIOS = ['SUPERMERCADO EJEMPLO', 'FARMACIA DEL BARRIO', 'MERPAGO*ALMACEN', 'COMBUSTIBLES SUR', 'LIBRERIA CENTRAL', 'RESTAURANTE LA ESQUINA', 'TIENDA DE ROPA', 'GIMNASIO FORMA']
+
+def ar2(v):
+    return f"{abs(v):,.2f}".replace(',', 'X').replace('.', ',').replace('X', '.')
+
+def card(path, style):
+    """Credit card statements with the layouts of other issuers (invented data).
+    style: santander (year-month-day date, then day only), prisma (02-09-26, C.06/12 before the voucher), mastercard (05 Oct 26),
+    amex (Importe en $ / Importe en U$S), naranja (one pesos column, "Total a pagar")."""
+    rnd = random.Random(hash(style) % 1000)
+    c = CharCanvas(os.path.join(OUT, path), pagesize=A4); c.setFont('Helvetica', 8)
+    c.drawString(40, H - 50, 'Tarjeta Ejemplo - resumen inventado para pruebas')
+    op_ars, op_usd = round(rnd.uniform(50000, 300000), 2), 0.0
+    pay = op_ars
+    buys = [(i + 2, rnd.choice(COMERCIOS), round(rnd.uniform(1500, 90000), 2), (f"{rnd.randint(1, 3):02d}/{rnd.choice([3, 6, 12]):02d}" if rnd.random() < 0.3 else '')) for i in range(18)]
+    usd_buys = [(21, 'STREAMING EJEMPLO USD 9,99', 9.99), (24, 'NUBE ALMACENAMIENTO USD 2,99', 2.99)]
+    taxes = [('IMPUESTO DE SELLOS', 1830.0), ('DB IVA $ 21%', 2520.0), ('COMISION MANTENIMIENTO', 12000.0)]
+    cons_ars = round(sum(b[2] for b in buys), 2); cons_usd = round(sum(u[2] for u in usd_buys), 2)
+    close_ars = round(op_ars - pay + cons_ars + sum(t[1] for t in taxes), 2); close_usd = round(op_usd + cons_usd, 2)
+    y = H - 110
+    if style == 'amex':
+        heads = [('Fecha', 40, 'l'), ('Detalle', 100, 'l'), ('Importe en $', 470, 'r'), ('Importe en U$S', 560, 'r')]
+    elif style == 'naranja':
+        heads = [('Fecha', 40, 'l'), ('Comercio', 100, 'l'), ('Cuota', 380, 'l'), ('Importe', 500, 'r')]
+    elif style == 'santander':
+        heads = [('FECHA', 40, 'l'), ('COMPROBANTE', 110, 'l'), ('DETALLE DE TRANSACCION', 170, 'l'), ('PESOS', 480, 'r'), ('DOLARES', 560, 'r')]
+    else:
+        heads = [('FECHA', 40, 'l'), ('NRO. CUPON' if style == 'mastercard' else 'COMPROBANTE', 100, 'l'), ('DETALLE DE TRANSACCION', 170, 'l'), ('PESOS', 480, 'r'), ('DOLARES', 560, 'r')]
+    pesos_x = 470 if style == 'amex' else 500 if style == 'naranja' else 480
+    c.setFont('Helvetica-Bold', 8)
+    for lab, x, al in heads: (c.drawRightString if al == 'r' else c.drawString)(x, y, lab)
+    c.setFont('Helvetica', 8); y -= 16
+    def date_cell(day, first):
+        if style == 'santander': return (f"26 {MONTHS_ES[9]} {day:02d}" if first else f"{day:02d}")
+        if style == 'prisma': return f"{day:02d}-10-26"
+        if style == 'mastercard': return f"{day:02d} Oct 26"
+        return f"{day:02d}/10/26"
+    def money(v, x, yy, trail=True):
+        if v is None: return
+        c.drawRightString(x, yy, ar2(v) + ('-' if v < 0 and trail else '') if trail or v >= 0 else '-' + ar2(v))
+    def line(day, first, desc, ars=None, usd=None, ref='', cuota=''):
+        nonlocal y
+        c.drawString(40, y, date_cell(day, first))
+        if style == 'prisma':
+            c.drawString(170, y, desc)
+            if cuota: c.drawString(330, y, 'C.' + cuota)
+            if ref: c.drawString(380, y, ref)
+        elif style == 'naranja':
+            c.drawString(100, y, desc)
+            if cuota: c.drawString(380, y, cuota)
+        elif style == 'amex':
+            c.drawString(100, y, desc + (f' C.{cuota}' if cuota else ''))
+        else:
+            if ref: c.drawString(110 if style == 'santander' else 100, y, ref)
+            c.drawString(170, y, ('* ' if style == 'santander' else '') + desc + (f'  C.{cuota}' if cuota else ''))
+        money(ars, pesos_x, y, style != 'naranja')
+        if style != 'naranja': money(usd, 560, y)
+        y -= 13
+    # previous balance and payment
+    c.drawString(170 if style not in ('naranja', 'amex') else 100, y, 'SALDO ANTERIOR'); money(op_ars, pesos_x, y)
+    if style != 'naranja': money(op_usd, 560, y)
+    y -= 13
+    line(1, True, 'SU PAGO EN PESOS', ars=-pay)
+    for i, (day, desc, amt, cuota) in enumerate(buys):
+        line(day, False, desc, ars=amt, ref=f"{rnd.randint(1, 999999):06d}", cuota=cuota)
+    if style != 'naranja':
+        for day, desc, amt in usd_buys: line(day, False, desc, usd=amt, ref=f"{rnd.randint(1, 999999):06d}")
+    c.drawString(170 if style not in ('naranja', 'amex') else 100, y, 'TARJETA 1234 Total Consumos de NOMBRE EJEMPLO'); money(cons_ars + (0 if style != 'naranja' else 0), pesos_x, y)
+    if style != 'naranja': money(cons_usd, 560, y)
+    y -= 16
+    for desc, amt in taxes: line(28, False, desc, ars=amt)
+    y -= 6
+    c.drawString(170 if style not in ('naranja', 'amex') else 100, y, 'TOTAL A PAGAR' if style == 'naranja' else 'SALDO ACTUAL'); money(close_ars, pesos_x, y)
+    if style != 'naranja': money(close_usd, 560, y)
+    c.drawString(40, y - 30, 'Pago minimo $ ' + ar2(round(close_ars * 0.1, 2)))
+    c.save()
+    n = 1 + len(buys) + (0 if style == 'naranja' else len(usd_buys)) + len(taxes)
+    return {'rows': n, 'card': True, 'ars': {'opening': op_ars, 'closing': close_ars}, 'usd': None if style == 'naranja' else {'opening': op_usd, 'closing': close_usd}}
+
+if __name__ == '__main__':
+    e = json.load(open(os.path.join(OUT, 'expected.json')))
+    for cw, suf in ((False, ''), (True, '_chars')):
+        CHARWISE = cw
+        for st in ('santander', 'prisma', 'mastercard', 'amex', 'naranja'):
+            e['tarjeta_' + st + suf] = card('tarjeta_' + st + suf + '.pdf', st)
     json.dump(e, open(os.path.join(OUT, 'expected.json'), 'w'), indent=1)

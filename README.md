@@ -26,7 +26,7 @@ Además, la página le prohíbe al navegador conectarse a otros sitios (`Content
 - `src/worker.js`: Cloudflare Worker para `/api/*` (contadores anónimos en D1 y el panel de uso) y las direcciones:
   `renglon.com.ar` (el sitio, cuenta el uso), `admin.renglon.com.ar` (panel) y `test.renglon.com.ar` (copia que no guarda nada).
 - `tools/build_pages.py`: arma las páginas HTML. `tools/make_samples.py`: resúmenes de ejemplo inventados.
-- Pruebas: `cd test && npm install && node run.js && node layouts.js`. `test/make_layouts.py` arma resúmenes inventados con el diseño de otros bancos (Nación, Comafi, Santander, Macro, Patagonia, Hipotecario).
+- Pruebas: `cd test && npm install && node run.js && node layouts.js`. `test/make_layouts.py` arma resúmenes inventados con el diseño de otros bancos: cuentas (Nación, Comafi, Santander, Macro, Patagonia, Hipotecario, billetera en dólares) y tarjetas (Santander, Visa y Mastercard procesadas por Prisma y Fiserv, American Express, una sola columna en pesos). `test/external/` tiene ejemplos inventados de otros proyectos, con su licencia.
 
 ## Licencia
 

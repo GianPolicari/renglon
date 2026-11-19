@@ -1,4 +1,28 @@
 {
+ "../external/cabal_ejemplo": {
+  "rows": 19,
+  "card": true,
+  "ars": {
+   "opening": 512640.25,
+   "closing": 484473.22
+  },
+  "usd": {
+   "opening": 0,
+   "closing": 0
+  }
+ },
+ "../external/visa_ejemplo": {
+  "rows": 18,
+  "card": true,
+  "ars": {
+   "opening": 478215.6,
+   "closing": 475808.3
+  },
+  "usd": {
+   "opening": 0,
+   "closing": 12.99
+  }
+ },
  "nacion": {
   "rows": 30,
   "opening": -20000.0,
@@ -68,5 +92,119 @@
   "rows": 24,
   "opening": 0.0,
   "closing": 175.24
+ },
+ "tarjeta_santander": {
+  "rows": 24,
+  "card": true,
+  "ars": {
+   "opening": 185649.62,
+   "closing": 808440.94
+  },
+  "usd": {
+   "opening": 0.0,
+   "closing": 12.98
+  }
+ },
+ "tarjeta_prisma": {
+  "rows": 24,
+  "card": true,
+  "ars": {
+   "opening": 73260.66,
+   "closing": 865911.16
+  },
+  "usd": {
+   "opening": 0.0,
+   "closing": 12.98
+  }
+ },
+ "tarjeta_mastercard": {
+  "rows": 24,
+  "card": true,
+  "ars": {
+   "opening": 251025.76,
+   "closing": 886337.85
+  },
+  "usd": {
+   "opening": 0.0,
+   "closing": 12.98
+  }
+ },
+ "tarjeta_amex": {
+  "rows": 24,
+  "card": true,
+  "ars": {
+   "opening": 90894.31,
+   "closing": 886826.27
+  },
+  "usd": {
+   "opening": 0.0,
+   "closing": 12.98
+  }
+ },
+ "tarjeta_naranja": {
+  "rows": 22,
+  "card": true,
+  "ars": {
+   "opening": 174384.14,
+   "closing": 734013.93
+  },
+  "usd": null
+ },
+ "tarjeta_santander_chars": {
+  "rows": 24,
+  "card": true,
+  "ars": {
+   "opening": 185649.62,
+   "closing": 808440.94
+  },
+  "usd": {
+   "opening": 0.0,
+   "closing": 12.98
+  }
+ },
+ "tarjeta_prisma_chars": {
+  "rows": 24,
+  "card": true,
+  "ars": {
+   "opening": 73260.66,
+   "closing": 865911.16
+  },
+  "usd": {
+   "opening": 0.0,
+   "closing": 12.98
+  }
+ },
+ "tarjeta_mastercard_chars": {
+  "rows": 24,
+  "card": true,
+  "ars": {
+   "opening": 251025.76,
+   "closing": 886337.85
+  },
+  "usd": {
+   "opening": 0.0,
+   "closing": 12.98
+  }
+ },
+ "tarjeta_amex_chars": {
+  "rows": 24,
+  "card": true,
+  "ars": {
+   "opening": 90894.31,
+   "closing": 886826.27
+  },
+  "usd": {
+   "opening": 0.0,
+   "closing": 12.98
+  }
+ },
+ "tarjeta_naranja_chars": {
+  "rows": 22,
+  "card": true,
+  "ars": {
+   "opening": 174384.14,
+   "closing": 734013.93
+  },
+  "usd": null
  }
 }

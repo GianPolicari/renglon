@@ -114,7 +114,7 @@
   function words(items) {
     const out = [];
     for (const it of items) {
-      const str = it.str, cw = str.length ? (it.w || str.length * 4.5) / str.length : 4.5;
+      const str = it.str.replace(/[\u2010-\u2015\u2212]/g, '-'), cw = str.length ? (it.w || str.length * 4.5) / str.length : 4.5;   // typographic dashes and minus signs
       const re = /\S+/g; let m;
       while ((m = re.exec(str))) out.push({ s: m[0], x: it.x + m.index * cw, r: it.x + (m.index + m[0].length) * cw });
     }
@@ -136,7 +136,7 @@
   function roleOf(w) {
     const n = norm(w);
     if (/^fecha|^fec$|^dia$/.test(n)) return 'date';
-    if (/^(conceptos?|descripcion|descripciones|detalle|detalles|movimientos?|leyenda|operacion|operaciones|transaccion|transacciones|establecimiento)$/.test(n)) return 'desc';
+    if (/^(conceptos?|descripcion|descripciones|detalle|detalles|movimientos?|leyenda|operacion|operaciones|transaccion|transacciones|establecimiento|comercios?)$/.test(n)) return 'desc';
     if (/^(referencias?|ref|refer|comprobantes?|comprob|nrocomprobante|cupon|numero|nro|origen|codigo|cod)$/.test(n)) return 'ref';
     if (/^cuotas?$|^plan$/.test(n)) return 'cuota';
     if (/^(debitos?|debe|egresos?|retiros?|cargos?)$/.test(n)) return 'debit';
@@ -238,7 +238,7 @@
 
   function parse(pages) {
     const rows = [], warnings = [], summary = { ars: {}, usd: {} };
-    let cols = null, last = null, latestIso = null, groupDate = null, refIso = null;
+    let cols = null, last = null, latestIso = null, groupDate = null, refIso = null, lastSubtotalAt = -1, lastDated = null;
     const allText = [];
     const stats = { headers: 0, dateLines: 0, chars: 0, plain: 0 };   // only to say why nothing was read
 
@@ -274,12 +274,25 @@
             const c = moneyColumn(cols, t);
             if (!c && !t.cur) continue;
             const cur = t.cur === 'USD' || (c && c.role === 'usd') ? 'usd' : 'ars';
-            if (summary[cur][kind] == null) summary[cur][kind] = parseAmount(t.s);
+            // several cardholders: one "Total consumos" each, and they add up
+            if (kind === 'subtotal') summary[cur].subtotal = r2((summary[cur].subtotal || 0) + parseAmount(t.s));
+            else if (summary[cur][kind] == null) summary[cur][kind] = parseAmount(t.s);
           }
+          if (kind === 'subtotal') lastSubtotalAt = rows.length;
           last = null;
           continue;
         }
-        const d = readDate(toks);
+        let d = readDate(toks);
+        if (d && d.iso && d.used === 3 && /^\d{2}$/.test(toks[0].s) && /^\d{1,2}$/.test(toks[2].s)) {
+          const ry = +(latestIso || refIso || new Date().toISOString()).slice(0, 4), y = +d.iso.slice(0, 4), alt = validDate(+toks[2].s, +d.iso.slice(5, 7), fullYear(+toks[0].s));
+          if (alt && Math.abs(y - ry) > 1 && Math.abs(+alt.slice(0, 4) - ry) <= 1) d = { iso: alt, used: 3 };
+        }
+        if (!d && lastDated && /^\d{1,2}$/.test(toks[0].s) && +toks[0].s >= 1 && +toks[0].s <= 31 && toks.length > 2) {
+          const dc = cols.find(c => c.role === 'date'), t0 = toks[0];
+          const inDateCol = dc ? t0.x <= dc.r + 40 && t0.r >= dc.x - 10 : t0.x < (descLeft != null ? descLeft : 0);
+          const iso = inDateCol && amounts.some(t => moneyColumn(cols, t)) ? validDate(+t0.s, +lastDated.slice(5, 7), +lastDated.slice(0, 4)) : null;
+          if (iso) d = { iso, used: 1 };
+        }
         if (d) stats.dateLines++;
         if (d) {
           const row = { date: d.iso || null, partial: d.partial || null, desc: '', ref: '', cuota: '', debit: null, credit: null, amount: null, balance: null, ars: null, usd: null, page: pi + 1, flags: [] };
@@ -298,14 +311,15 @@
             // a voucher or reference number: digits, under a "Comprobante"/"Referencia" heading (some banks title the description "Referencia")
             const mid = (t.x + t.r) / 2;
             const refCol = cols.filter(c => c.role === 'ref').sort((p, q) => Math.abs(p.c - mid) - Math.abs(q.c - mid))[0];
-            if (refCol && /^[\dA-Z\-]{3,}$/.test(t.s) && /\d{5,}/.test(t.s) && Math.abs(mid - refCol.c) < 40 && !row.ref) { row.ref = t.s; continue; }
+            if (refCol && /^[\dA-Z\-]{3,}$/.test(t.s) && (/\d{5,}/.test(t.s) || (/^\d{4}$/.test(t.s) && !text.length && Math.abs(mid - refCol.c) < 25)) && Math.abs(mid - refCol.c) < 40 && !row.ref) { row.ref = t.s; continue; }
             if (takeLocal(cols, row, t)) continue;
             text.push(t.s);
           }
           row.desc = text.join(' ');
+          if (row.cuota) row.desc = row.desc.replace(/\s+(?:cta|cuota|cuotas)\.?$/i, '');
           const hasMoney = ['debit', 'credit', 'amount', 'ars', 'usd'].some(k => row[k] != null);
           if (!hasMoney && row.balance == null) { last = null; continue; }   // a date line with no amount: not a movement
-          rows.push(row); last = row;
+          rows.push(row); last = row; if (row.date) lastDated = row.date;
           continue;
         }
         // a line without a date: description continued on the next line, or a movement with no date of its own
@@ -356,7 +370,13 @@
     }
     for (const r of rows) delete r.partial;
 
-    const kind = rows.some(r => r.ars != null || r.usd != null) ? 'tarjeta' : 'cuenta';
+    let kind = rows.some(r => r.ars != null || r.usd != null) ? 'tarjeta' : 'cuenta';
+    const text6 = allText.join('\n').slice(0, 20000);
+    if (kind === 'cuenta' && rows.length && !rows.some(r => r.balance != null || r.debit != null || r.credit != null)
+        && (summary.ars.minimum != null || /total a pagar|pago m[ií]nimo|tarjeta de cr[eé]dito/i.test(text6))) {
+      kind = 'tarjeta';
+      for (const r of rows) { r.ars = r.amount; r.amount = null; }
+    }
     // signed amount of every movement (credits positive, debits negative) for bank accounts
     if (kind === 'cuenta') {
       for (const r of rows) {
@@ -367,7 +387,11 @@
       }
     }
     // card statements: what each line is, so purchases can be checked against the statement's own "Total consumos"
-    if (kind === 'tarjeta') for (const r of rows) r.type = (r.ars || 0) < 0 || (r.usd || 0) < 0 ? 'pago' : (r.ref || r.cuota) ? 'consumo' : 'cargo';
+    if (kind === 'tarjeta') rows.forEach((r, i) => {
+      r.type = (r.ars || 0) < 0 || (r.usd || 0) < 0 ? 'pago'
+        : lastSubtotalAt >= 0 ? (i < lastSubtotalAt ? 'consumo' : 'cargo')
+        : (r.ref || r.cuota) ? 'consumo' : 'cargo';
+    });
     const check = kind === 'cuenta' ? checkAccount(rows, summary.ars) : checkCard(rows, summary);
     if (!rows.length) warnings.push('No se encontraron movimientos. Puede que el formato de este resumen todavía no esté soportado.');
     // why nothing was read, as a code (never content): helps decide what to fix
