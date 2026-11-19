@@ -4,7 +4,7 @@
 // through view -> select -> convert -> download. No persistent user id is kept.
 (function () {
   'use strict';
-  const VERSION = '0.3.0';
+  const VERSION = '0.4.0';
   const optOut = navigator.globalPrivacyControl === true || navigator.doNotTrack === '1';
   const rand = () => Array.from(crypto.getRandomValues(new Uint8Array(6)), b => (b % 36).toString(36)).join('') + Date.now().toString(36).slice(-4);
   let sid = null, returning = 0, owner = 0;

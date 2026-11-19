@@ -83,7 +83,8 @@
       lastOutcome = outcome;
       lastLayout = outcome === 'ok' ? null : buildLayout(pages);
       offerLayout();
-      T('convert', { fid, outcome, error: outcome === 'ok' ? null : outcome === 'no_rows' ? 'layout_not_recognized' : outcome, software: result.kind, broker: result.issuer,
+      if (outcome === 'no_rows' && !isSample) $('#layoutCard').scrollIntoView({ behavior: 'smooth', block: 'center' });
+      T('convert', { fid, outcome, error: outcome === 'ok' ? null : outcome === 'no_rows' ? (result.diagnosis || 'layout_not_recognized') : outcome, software: result.kind, broker: result.issuer,
         pages: pages.length, rows: result.rows.length, sections: 1, sections_ok: st === 'ok' ? 1 : 0, flagged: result.rows.filter(r => r.flags.length).length, ms, size_kb: sizeKb });
     } catch (e) {
       if (e instanceof Stop) return fail(e.outcome, e.message);
@@ -220,14 +221,14 @@
   // ---- layout of an unrecognized statement, safe to share ----
   // Heading lines keep only words from a fixed vocabulary of statement column and section labels (every other word
   // becomes T, every digit 9); other lines keep only the kind and position of each value (D date, M amount, N number, T word).
-  const LAYOUT_KEYWORDS = /fecha|concepto|descripci[oó]n|detalle|movimiento|referencia|comprobante|d[eé]bito|cr[eé]dito|saldo|importe|pesos|d[oó]lares|u\$s|cuota|total|anterior|actual|final|pago|consumos/i;
+  const LAYOUT_KEYWORDS = /fecha|concepto|descripci[oó]n|detalle|movimiento|referencia|comprobante|d[eé]bito|cr[eé]dito|saldo|importe|pesos|d[oó]lares|u\$s|cuota|total|anterior|actual|final|pago|consumos|transporte/i;
   const LAYOUT_VOCAB = /^(fecha|fec|concepto|descripci[oó]n|detalle|de|del|la|el|movimientos?|referencia|ref|comprobante|nro|n[º°]|d[eé]bitos?|cr[eé]ditos?|debe|haber|saldos?|importes?|monto|pesos|d[oó]lares|u\$s|usd|\$|cuotas?|total|totales|anterior|actual|final|inicial|pago|m[ií]nimo|consumos|transacci[oó]n|operaci[oó]n|cierre|vencimiento|per[ií]odo|al|en|su)$/i;
   const layoutWord = s => { const w = s.replace(/^[(\[]+|[)\],.:;]+$/g, ''); return LAYOUT_VOCAB.test(w) ? s.replace(/\d/g, '9').slice(0, 24) : /^[\d$,.()\-–—\/]+$/.test(s) ? s.replace(/\d/g, '9').slice(0, 16) : 'T'; };
-  function buildLayout(pages) {
+  function buildLayout(pages, anyPage) {
     const out = []; let budget = 11000;
     pages.slice(0, 12).forEach((items, pi) => {
       const lines = P.toLines(items);
-      if (!lines.some(l => LAYOUT_KEYWORDS.test(l.text))) return;
+      if (!anyPage && !lines.some(l => LAYOUT_KEYWORDS.test(l.text))) return;
       out.push(`--- page ${pi + 1}`);
       for (const l of lines) {
         let row = LAYOUT_KEYWORDS.test(l.text)
@@ -238,6 +239,7 @@
         out.push(row);
       }
     });
+    if (!out.length && !anyPage) return buildLayout(pages.slice(0, 2), true);   // no heading word anywhere: the first pages, as types only
     return out.join('\n');
   }
   function offerLayout(reason) {

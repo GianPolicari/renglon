@@ -87,7 +87,7 @@
     const merged = [];
     for (let i = 0; i < out.length; i++) {
       const t = out[i], n = out[i + 1];
-      if (n && /^(?:\$|U\$S|US\$|USD)$/.test(t.s) && isAmount(n.s) && n.x - t.r < 14) { merged.push({ s: t.s + ' ' + n.s, x: t.x, r: n.r, cur: t.s === '$' ? 'ARS' : 'USD' }); i++; continue; }
+      if (n && /^[-−]?(?:\$|U\$S|US\$|USD)$/.test(t.s) && isAmount(n.s) && n.x - t.r < 14) { merged.push({ s: t.s + ' ' + n.s, x: t.x, r: n.r, cur: /^[-−]?\$$/.test(t.s) ? 'ARS' : 'USD' }); i++; continue; }
       if (n && isAmount(t.s) && /^[-−]$/.test(n.s) && n.x - t.r < 6) { merged.push({ s: t.s + '-', x: t.x, r: n.r }); i++; continue; }
       merged.push(t);
     }
@@ -100,8 +100,8 @@
   function roleOf(w) {
     const n = norm(w);
     if (/^fecha|^fec$|^dia$/.test(n)) return 'date';
-    if (/^(concepto|descripcion|detalle|movimiento|movimientos|leyenda|operacion|transaccion|establecimiento)$/.test(n)) return 'desc';
-    if (/^(referencia|ref|comprobante|comprob|nrocomprobante|cupon|numero|nro|origen|codigo|cod)$/.test(n)) return 'ref';
+    if (/^(conceptos?|descripcion|descripciones|detalle|detalles|movimientos?|leyenda|operacion|operaciones|transaccion|transacciones|establecimiento)$/.test(n)) return 'desc';
+    if (/^(referencias?|ref|refer|comprobantes?|comprob|nrocomprobante|cupon|numero|nro|origen|codigo|cod)$/.test(n)) return 'ref';
     if (/^cuotas?$|^plan$/.test(n)) return 'cuota';
     if (/^(debitos?|debe|egresos?|retiros?|cargos?)$/.test(n)) return 'debit';
     if (/^(creditos?|haber|ingresos?|depositos?|abonos?)$/.test(n)) return 'credit';
@@ -127,6 +127,8 @@
     const money = cols.filter(c => MONEY.has(c.role)).length;
     if (!money || cols.length < 2) return null;
     if (!roles.has('date') && money < 2) return null;      // "PESOS DÓLARES" alone is a heading too
+    // "Saldo en $" or "Débitos $" on a bank account: the "$" names the currency, not a pesos column
+    if (roles.has('ars') && !roles.has('usd') && (roles.has('debit') || roles.has('credit') || roles.has('balance'))) return cols.filter(c => c.role !== 'ars');
     // "Importe" next to "Pesos"/"Dólares" headings is a group title, not a column of its own
     if (roles.has('ars') || roles.has('usd')) return cols.filter(c => c.role !== 'amount');
     return cols;
@@ -136,7 +138,7 @@
     let best = null, bd = Infinity;
     for (const c of cols) {
       if (!MONEY.has(c.role)) continue;
-      if (tok.r < c.x - 25 || tok.r > c.r + 70) continue;   // not under this heading
+      if (tok.r < c.x - 25 || tok.r > c.r + 100) continue;  // not under this heading (wide columns: heading left, amount right)
       const d = Math.min(Math.abs(tok.r - c.r), Math.abs((tok.x + tok.r) / 2 - c.c));
       if (d < bd) { bd = d; best = c; }
     }
@@ -146,7 +148,7 @@
   // ---- summary lines -------------------------------------------------------------------------
   const SUMMARY = [
     ['opening', /saldo (anterior|inicial|al inicio)|saldo del (resumen|periodo) anterior|saldo ultimo resumen/],
-    ['closing', /saldo (final|actual|al cierre|a la fecha)|nuevo saldo|saldo del periodo|total a pagar|saldo de cierre/],
+    ['closing', /saldo (final|actual|al cierre|a la fecha|total)|saldo al\b|nuevo saldo|saldo del periodo|total a pagar|saldo de cierre/],
     ['total_debits', /total (de )?(debitos|debe|egresos)/],
     ['total_credits', /total (de )?(creditos|haber|ingresos)/],
     ['minimum', /pago minimo/],
@@ -179,23 +181,40 @@
 
   // ---- main ----------------------------------------------------------------------------------
   // pages: array of pdf.js text item arrays. Returns { kind, rows, summary, check, warnings, issuer }.
+  // page-break carry-over lines ("Transporte", "Van", "Vienen") repeat a balance; they are not movements
+  const CARRY_RE = /^(transporte|saldo transporte|a transportar|de transporte|van|vienen|saldo que pasa|saldo que viene)\b/i;
+  const LEADING_DATE = /^\d{1,2}[\/\-.]\d{1,2}(?:[\/\-.]\d{2,4})?\s+/;
+  function dateOnly(ln) { const d = readDate(ln.tokens); return d && d.used === ln.tokens.length ? d : null; }
+
   function parse(pages) {
     const rows = [], warnings = [], summary = { ars: {}, usd: {} };
     let cols = null, last = null, latestIso = null;
     const allText = [];
+    const stats = { headers: 0, dateLines: 0, chars: 0, plain: 0 };   // only to say why nothing was read
 
     pages.forEach((items, pi) => {
       const lines = toLines(items);
       allText.push(lines.map(l => l.text).join('\n'));
       let descLeft = null, descRight = null;
-      for (const ln of lines) {
+      for (const ln of lines) { stats.chars += ln.text.length; stats.plain += (ln.text.match(/[A-Za-z0-9ÁÉÍÓÚÑáéíóúñ .,:\/$%()*\-]/g) || []).length; }
+      for (let li = 0; li < lines.length; li++) {
+        const ln = lines[li];
         const h = readHeader(ln);
-        if (h) { cols = h; last = null; setDescBounds(); continue; }
+        if (h) { cols = h; last = null; stats.headers++; setDescBounds(); continue; }
         if (!cols) continue;
-        const toks = ln.tokens;
+        let toks = ln.tokens;
+        if (CARRY_RE.test(ln.text.replace(LEADING_DATE, ''))) continue;
+        if (dateOnly(ln)) { stats.dateLines++; continue; }      // a date alone on its line belongs to the movement beside it
+        // the date may not be the first word (a code before it): take the one under the "Fecha" heading
+        if (!readDate(toks)) {
+          const dc = cols.find(c => c.role === 'date');
+          const i = dc ? toks.findIndex(t => t.x <= dc.r + 15 && t.r >= dc.x - 15 && readDate([t])) : -1;
+          if (i > 0) toks = [toks[i], ...toks.slice(0, i), ...toks.slice(i + 1)];
+        }
         const amounts = toks.filter(t => isAmount(t.s));
         const kind = summaryKind(ln.text);
-        if (kind && !readDate(toks)) {                          // "Saldo anterior ... 12.345,67"
+        const onlyBalance = !amounts.some(t => { const c = moneyColumn(cols, t); return c && c.role !== 'balance'; });
+        if (kind && (!readDate(toks) || ((kind === 'opening' || kind === 'closing') && onlyBalance && cols.some(c => c.role === 'balance')))) {   // "Saldo anterior ... 12.345,67"
           for (const t of amounts) {
             const c = moneyColumn(cols, t);
             if (!c && !t.cur) continue;
@@ -206,6 +225,7 @@
           continue;
         }
         const d = readDate(toks);
+        if (d) stats.dateLines++;
         if (d) {
           const row = { date: d.iso || null, partial: d.partial || null, desc: '', ref: '', cuota: '', debit: null, credit: null, amount: null, balance: null, ars: null, usd: null, page: pi + 1, flags: [] };
           if (d.iso && (!latestIso || d.iso > latestIso)) latestIso = d.iso;
@@ -237,13 +257,21 @@
           last.desc = (last.desc + ' ' + ln.text).trim();
           continue;
         }
-        if (amounts.some(t => moneyColumn(cols, t)) && last && toks.some(t => !isAmount(t.s)) && !kind) {
+        // the date printed on its own line, centred on a two-line movement (Santander and others)
+        let nd = null;
+        for (const j of [li + 1, li - 1]) { const o = lines[j]; if (o && Math.abs(o.y - ln.y) <= 10 && dateOnly(o)) { nd = dateOnly(o); break; } }
+        if (amounts.some(t => moneyColumn(cols, t)) && (last || nd) && toks.some(t => !isAmount(t.s)) && !kind) {
           // taxes and charges printed under the last movement without a date (common on card statements)
-          const row = { date: last.date, partial: last.partial, desc: '', ref: '', cuota: '', debit: null, credit: null, amount: null, balance: null, ars: null, usd: null, page: pi + 1, flags: ['sin fecha en el resumen: se usó la del movimiento anterior'] };
+          const row = nd
+            ? { date: nd.iso || null, partial: nd.partial || null, desc: '', ref: '', cuota: '', debit: null, credit: null, amount: null, balance: null, ars: null, usd: null, page: pi + 1, flags: [] }
+            : { date: last.date, partial: last.partial, desc: '', ref: '', cuota: '', debit: null, credit: null, amount: null, balance: null, ars: null, usd: null, page: pi + 1, flags: ['sin fecha en el resumen: se usó la del movimiento anterior'] };
+          if (nd && nd.iso && (!latestIso || nd.iso > latestIso)) latestIso = nd.iso;
           const text = [];
           for (const t of toks) {
             const c = isAmount(t.s) ? moneyColumn(cols, t) : null;
             if (c) { if (row[c.role] == null) row[c.role] = parseAmount(t.s); continue; }
+            const mid = (t.x + t.r) / 2, refCol = cols.find(k => k.role === 'ref' && Math.abs(mid - k.c) < 40);
+            if (refCol && !row.ref && /^\d{3,}$/.test(t.s)) { row.ref = t.s; continue; }
             text.push(t.s);
           }
           row.desc = text.join(' ');
@@ -284,7 +312,14 @@
     if (kind === 'tarjeta') for (const r of rows) r.type = (r.ars || 0) < 0 || (r.usd || 0) < 0 ? 'pago' : (r.ref || r.cuota) ? 'consumo' : 'cargo';
     const check = kind === 'cuenta' ? checkAccount(rows, summary.ars) : checkCard(rows, summary);
     if (!rows.length) warnings.push('No se encontraron movimientos. Puede que el formato de este resumen todavía no esté soportado.');
-    return { kind, rows, summary, check, warnings, issuer: detectIssuer(allText.join('\n')) };
+    // why nothing was read, as a code (never content): helps decide what to fix
+    const diagnosis = rows.length ? null
+      : stats.chars < 50 ? 'no_text'
+      : stats.plain / stats.chars < 0.7 ? 'garbled_text'
+      : !stats.headers ? 'no_header'
+      : !stats.dateLines ? 'no_dates'
+      : 'no_amounts_in_columns';
+    return { kind, rows, summary, check, warnings, diagnosis, issuer: detectIssuer(allText.join('\n')) };
   }
 
   // Bank account: every running balance must follow from the one before it, and the last one must be the closing balance.

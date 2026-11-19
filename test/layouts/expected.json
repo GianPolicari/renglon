@@ -1,0 +1,62 @@
+{
+ "nacion": {
+  "rows": 30,
+  "opening": -20000.0,
+  "closing": -753039.98
+ },
+ "comafi": {
+  "rows": 30,
+  "opening": 150000.0,
+  "closing": -830426.72
+ },
+ "santander": {
+  "rows": 20,
+  "opening": 30000.0,
+  "closing": -116990.55
+ },
+ "macro": {
+  "rows": 30,
+  "opening": 150000.0,
+  "closing": -79229.07
+ },
+ "patagonia": {
+  "rows": 30,
+  "opening": 150000.0,
+  "closing": 348983.86
+ },
+ "hipotecario": {
+  "rows": 30,
+  "opening": 150000.0,
+  "closing": -806864.63
+ },
+ "nacion_chars": {
+  "rows": 30,
+  "opening": -20000.0,
+  "closing": -753039.98
+ },
+ "comafi_chars": {
+  "rows": 30,
+  "opening": 150000.0,
+  "closing": -830426.72
+ },
+ "santander_chars": {
+  "rows": 20,
+  "opening": 30000.0,
+  "closing": -116990.55
+ },
+ "macro_chars": {
+  "rows": 30,
+  "opening": 150000.0,
+  "closing": -79229.07
+ },
+ "patagonia_chars": {
+  "rows": 30,
+  "opening": 150000.0,
+  "closing": 348983.86
+ },
+ "hipotecario_chars": {
+  "rows": 30,
+  "opening": 150000.0,
+  "closing": -806864.63
+ }
+}
